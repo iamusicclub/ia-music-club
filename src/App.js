@@ -5,6 +5,7 @@ import {
   onAuthStateChanged,
   signOut,
 } from "firebase/auth";
+import NominateAlbum from "./NominateAlbum";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -33,6 +34,7 @@ function App() {
       {user ? (
         <>
           <p>Hello, {user.email}</p>
+          <NominateAlbum />
           <button onClick={logout}>Logout</button>
         </>
       ) : (
