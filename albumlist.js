@@ -62,3 +62,4 @@ export default function AlbumList() {
     </div>
   );
 }
+console.log("AlbumList rendered with", albums.length, "albums");
