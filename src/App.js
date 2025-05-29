@@ -6,6 +6,7 @@ import {
   signOut,
 } from "firebase/auth";
 import NominateAlbum from "./NominateAlbum";
+import albumlist from "./albumlist";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -35,6 +36,7 @@ function App() {
         <>
           <p>Hello, {user.email}</p>
           <NominateAlbum />
+          <albumlist />
           <button onClick={logout}>Logout</button>
         </>
       ) : (
