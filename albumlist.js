@@ -5,6 +5,8 @@ import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 export default function AlbumList() {
   const [albums, setAlbums] = useState([]);
 
+  console.log("AlbumList rendered with", albums.length, "albums");
+
   useEffect(() => {
     const q = query(
       collection(db, "albums"),
@@ -62,4 +64,3 @@ export default function AlbumList() {
     </div>
   );
 }
-console.log("AlbumList rendered with", albums.length, "albums");
