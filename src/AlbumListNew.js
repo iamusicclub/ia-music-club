@@ -67,7 +67,6 @@ export default function AlbumList() {
     return () => unsubscribe();
   }, []);
 
-  // Submit rating
   const handleRate = async (albumId, value) => {
     const user = auth.currentUser;
     if (!user) return;
@@ -219,7 +218,7 @@ export default function AlbumList() {
                       key={r.userId}
                       style={{ fontSize: "0.85em", marginBottom: "4px" }}
                     >
-                      {r.userEmail} rated {r.score}/10
+                      {r.username || r.userEmail} rated {r.score}/10
                       {r.comment && (
                         <span
                           style={{ fontStyle: "italic", marginLeft: "6px" }}
