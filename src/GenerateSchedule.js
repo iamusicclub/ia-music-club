@@ -1,12 +1,16 @@
 import { useEffect } from "react";
 import { doc, setDoc } from "firebase/firestore";
-import { db } from "./firebase";
+import { db, auth } from "./firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
-// ✅ Replace with real userId/email values
 const members = [
-  { userId: "user_id_1", email: "user1@email.com" },
-  { userId: "user_id_2", email: "user2@email.com" },
-  { userId: "user_id_3", email: "user3@email.com" },
+  {
+    userId: "UJyzC0IXFAbt4RLsfwbFB6u35kz1",
+    email: "scottcee01@googlemail.com",
+  },
+  { userId: "Z2FQNDa3UwRUVDTqWcSEDJA5kvp2", email: "mattdhodges@outlook.com" },
+  { userId: "uMKdZGXTnafAQtX4QN80ShBYRhh2", email: "davews1621@gmail.com" },
+  { userId: "4ssyOFngYaV6liJMn3qHwtzQzAD2", email: "jfield1968@gmail.com" },
 ];
 
 const ukBankHolidays = [
@@ -21,6 +25,7 @@ const ukBankHolidays = [
 ];
 
 const generateSchedule = async (startDateStr, daysToAssign = 30) => {
+  console.log("🚀 Starting schedule generation...");
   const holidays = new Set(ukBankHolidays);
   let current = new Date(startDateStr);
   let assignedDays = 0;
@@ -37,8 +42,9 @@ const generateSchedule = async (startDateStr, daysToAssign = 30) => {
       await setDoc(ref, {
         userId: member.userId,
         userEmail: member.email,
+        assignedAt: new Date().toISOString(),
       });
-      console.log(`Assigned ${dateStr} to ${member.email}`);
+      console.log(`✅ Assigned ${dateStr} → ${member.email}`);
       assignedDays++;
       i++;
     }
@@ -46,18 +52,27 @@ const generateSchedule = async (startDateStr, daysToAssign = 30) => {
     current.setDate(current.getDate() + 1);
   }
 
-  console.log("✅ Schedule complete");
+  console.log("🎉 Schedule generation complete.");
 };
 
-export default function GenerateSchedule() {
+export default function GenerateSchedule({ user }) {
   useEffect(() => {
-    generateSchedule("2025-06-02", 30); // 30 weekdays from June 2
-  }, []);
+    if (user) {
+      console.log("🔐 Authenticated as", user.email);
+      generateSchedule("2025-06-02", 30);
+    } else {
+      console.warn("🔒 Not authenticated. Log in to generate schedule.");
+    }
+  }, [user]);
 
   return (
     <div style={{ padding: "1rem", background: "#f8f8f8" }}>
-      <h3>Generating Nomination Schedule...</h3>
-      <p>Check console and Firestore to verify output</p>
+      <h3>📅 Generating Nomination Schedule</h3>
+      <p>
+        {user
+          ? "Generating…"
+          : "Login required. Check the console and Firestore."}
+      </p>
     </div>
   );
 }

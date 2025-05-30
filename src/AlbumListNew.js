@@ -16,6 +16,7 @@ export default function AlbumList() {
   const [feedback, setFeedback] = useState({});
   const [minRating, setMinRating] = useState(0);
 
+  // Load albums
   useEffect(() => {
     const ref = collection(db, "albums");
     const unsubscribe = onSnapshot(ref, (snapshot) => {
@@ -23,17 +24,20 @@ export default function AlbumList() {
         id: doc.id,
         ...doc.data(),
       }));
-      // Sort albums by nominationDate descending (most recent first)
+
       albumData.sort((a, b) => {
         const dateA = a.nominationDate?.toDate?.() || new Date(0);
         const dateB = b.nominationDate?.toDate?.() || new Date(0);
         return dateB - dateA;
       });
+
       setAlbums(albumData);
     });
+
     return () => unsubscribe();
   }, []);
 
+  // Load ratings
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "ratings"), (snapshot) => {
       const ratingsMap = {};
@@ -44,9 +48,7 @@ export default function AlbumList() {
         all.push({ id: doc.id, ...data });
 
         const { albumId, score } = data;
-        if (!ratingsMap[albumId]) {
-          ratingsMap[albumId] = [];
-        }
+        if (!ratingsMap[albumId]) ratingsMap[albumId] = [];
         ratingsMap[albumId].push(score);
       });
 
@@ -65,15 +67,13 @@ export default function AlbumList() {
     return () => unsubscribe();
   }, []);
 
+  // Submit rating
   const handleRate = async (albumId, value) => {
     const user = auth.currentUser;
-    if (!user) {
-      console.warn("User not authenticated.");
-      return;
-    }
+    if (!user) return;
 
     const userId = user.uid;
-    const userEmail = user.email || "Unknown";
+    const userEmail = user.email;
     const comment =
       prompt("Optional: Leave a short comment about this album") || "";
 
@@ -81,9 +81,9 @@ export default function AlbumList() {
 
     try {
       const ratingId = `${userId}_${albumId}`;
-      const ratingRef = doc(db, "ratings", ratingId);
+      const ref = doc(db, "ratings", ratingId);
 
-      await setDoc(ratingRef, {
+      await setDoc(ref, {
         albumId,
         userId,
         userEmail,
@@ -102,19 +102,29 @@ export default function AlbumList() {
   };
 
   return (
-    <div>
-      <h2>Album Nominations</h2>
+    <div style={{ marginTop: "2rem" }}>
+      <h2>🎧 Album Nominations</h2>
 
-      <label>
-        Filter by minimum average rating:
-        <select onChange={(e) => setMinRating(Number(e.target.value))}>
-          {[0, 5, 6, 7, 8, 9].map((r) => (
-            <option key={r} value={r}>
-              {r}+
-            </option>
-          ))}
-        </select>
-      </label>
+      <div style={{ marginBottom: "1rem" }}>
+        <label>
+          Filter by minimum average rating:{" "}
+          <select
+            value={minRating}
+            onChange={(e) => setMinRating(Number(e.target.value))}
+            style={{
+              padding: "6px",
+              borderRadius: "4px",
+              border: "1px solid #ccc",
+            }}
+          >
+            {[0, 5, 6, 7, 8, 9].map((r) => (
+              <option key={r} value={r}>
+                {r}+
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       {albums.length === 0 && <p>No nominations yet.</p>}
 
@@ -128,11 +138,12 @@ export default function AlbumList() {
             key={album.id}
             style={{
               border: "1px solid #ccc",
-              borderRadius: "8px",
-              padding: "12px",
-              marginBottom: "12px",
+              borderRadius: "10px",
+              padding: "16px",
+              marginBottom: "16px",
               display: "flex",
-              alignItems: "center",
+              alignItems: "flex-start",
+              backgroundColor: "#fff",
             }}
           >
             {album.coverUrl ? (
@@ -143,8 +154,8 @@ export default function AlbumList() {
                   width: "100px",
                   height: "100px",
                   objectFit: "cover",
-                  marginRight: "16px",
-                  borderRadius: "4px",
+                  marginRight: "20px",
+                  borderRadius: "8px",
                 }}
               />
             ) : (
@@ -153,30 +164,29 @@ export default function AlbumList() {
                   width: "100px",
                   height: "100px",
                   backgroundColor: "#eee",
-                  marginRight: "16px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   fontSize: "12px",
                   color: "#888",
-                  borderRadius: "4px",
+                  borderRadius: "8px",
+                  marginRight: "20px",
                 }}
               >
                 No Image
               </div>
             )}
 
-            <div>
+            <div style={{ flex: 1 }}>
               <h3 style={{ margin: "0 0 4px 0" }}>{album.title}</h3>
-              <p style={{ margin: 0 }}>by {album.artist}</p>
+              <p style={{ margin: 0, color: "#555" }}>by {album.artist}</p>
 
               {ratingsByAlbum[album.id] ? (
-                <p style={{ margin: "4px 0" }}>
-                  ⭐ Average Rating: <strong>{ratingsByAlbum[album.id]}</strong>
-                  /10
+                <p style={{ margin: "6px 0", fontWeight: "bold" }}>
+                  ⭐ {ratingsByAlbum[album.id]} / 10
                 </p>
               ) : (
-                <p style={{ margin: "4px 0", color: "#888" }}>No ratings yet</p>
+                <p style={{ margin: "6px 0", color: "#888" }}>No ratings yet</p>
               )}
 
               <label>
@@ -184,6 +194,7 @@ export default function AlbumList() {
                 <select
                   value={ratings[album.id] || ""}
                   onChange={(e) => handleRate(album.id, e.target.value)}
+                  style={{ padding: "4px", marginLeft: "4px" }}
                 >
                   <option value="">--</option>
                   {[...Array(10)].map((_, i) => (
@@ -195,13 +206,7 @@ export default function AlbumList() {
               </label>
 
               {feedback[album.id] && (
-                <div
-                  style={{
-                    marginTop: "4px",
-                    fontSize: "0.85em",
-                    color: "green",
-                  }}
-                >
+                <div style={{ color: "green", marginTop: "4px" }}>
                   {feedback[album.id]}
                 </div>
               )}
@@ -212,40 +217,45 @@ export default function AlbumList() {
                   .map((r) => (
                     <div
                       key={r.userId}
-                      style={{ fontSize: "0.85em", color: "#444" }}
+                      style={{ fontSize: "0.85em", marginBottom: "4px" }}
                     >
-                      {r.userEmail} rated: {r.score}/10
+                      {r.userEmail} rated {r.score}/10
                       {r.comment && (
-                        <div style={{ fontStyle: "italic", marginLeft: "8px" }}>
+                        <span
+                          style={{ fontStyle: "italic", marginLeft: "6px" }}
+                        >
                           “{r.comment}”
-                        </div>
+                        </span>
                       )}
                     </div>
                   ))}
               </div>
 
-              <br />
-              <small>
+              <div
+                style={{ marginTop: "10px", fontSize: "0.8em", color: "#555" }}
+              >
                 Nominated by: <code>{album.nominatedBy}</code>
                 <br />
-                {album.nominationDate?.toDate &&
-                  `Nominated on: ${album.nominationDate
-                    .toDate()
-                    .toLocaleDateString()}`}
-                <br />
-                {(() => {
-                  const todayStr = new Date().toISOString().split("T")[0];
-                  const albumDate = album.nominationDate
-                    ?.toDate?.()
-                    ?.toISOString()
-                    .split("T")[0];
-                  return albumDate === todayStr ? (
-                    <span style={{ color: "green", fontWeight: "bold" }}>
-                      🆕 Nominated Today
-                    </span>
-                  ) : null;
-                })()}
-              </small>
+                {album.nominationDate?.toDate?.() && (
+                  <>
+                    Nominated on:{" "}
+                    {album.nominationDate.toDate().toLocaleDateString()}
+                    <br />
+                    {(() => {
+                      const todayStr = new Date().toISOString().split("T")[0];
+                      const albumDate = album.nominationDate
+                        ?.toDate?.()
+                        ?.toISOString()
+                        .split("T")[0];
+                      return albumDate === todayStr ? (
+                        <span style={{ color: "green", fontWeight: "bold" }}>
+                          🆕 Nominated Today
+                        </span>
+                      ) : null;
+                    })()}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         ))}

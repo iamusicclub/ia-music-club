@@ -9,19 +9,20 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import NominateAlbum from "./NominateAlbum";
 import AlbumList from "./AlbumListNew";
-// import GenerateSchedule from "./GenerateSchedule"; // Only needed temporarily
+import ScheduleViewer from "./ScheduleViewer";
+// import GenerateSchedule from "./GenerateSchedule"; // Use only if needed
 
 function App() {
   const [user, setUser] = useState(null);
   const [todaysNominator, setTodaysNominator] = useState(null);
 
-  // Auth listener
+  // Track auth state
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
-    return () => unsub();
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsubscribe();
   }, []);
 
-  // Fetch today's nominator from Firestore
+  // Fetch today's nominator
   useEffect(() => {
     const fetchNominator = async () => {
       const todayStr = new Date().toISOString().split("T")[0];
@@ -53,21 +54,76 @@ function App() {
   };
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2>🎤 Today's Nominator:</h2>
-      <p>
-        <strong>{todaysNominator || "Loading..."}</strong>
-      </p>
+    <div
+      style={{
+        fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+        maxWidth: "900px",
+        margin: "0 auto",
+        padding: "24px",
+        lineHeight: "1.6",
+        backgroundColor: "#fafafa",
+      }}
+    >
+      <header
+        style={{
+          padding: "1rem 0",
+          borderBottom: "1px solid #ccc",
+          marginBottom: "1.5rem",
+        }}
+      >
+        <h2 style={{ margin: 0 }}>🎤 Today's Nominator:</h2>
+        <p style={{ fontSize: "1.1rem", fontWeight: "bold", color: "#333" }}>
+          {todaysNominator || "Loading..."}
+        </p>
+      </header>
 
       {user ? (
         <>
-          <p>Hello, {user.email}</p>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "1rem",
+            }}
+          >
+            <p style={{ margin: 0 }}>👋 Hello, {user.email}</p>
+            <button
+              onClick={logout}
+              style={{
+                backgroundColor: "#1976d2",
+                color: "#fff",
+                padding: "8px 14px",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+              }}
+            >
+              Logout
+            </button>
+          </div>
+
           <NominateAlbum />
           <AlbumList />
-          <button onClick={logout}>Logout</button>
+          <ScheduleViewer />
         </>
       ) : (
-        <button onClick={login}>Login</button>
+        <div style={{ textAlign: "center", marginTop: "2rem" }}>
+          <button
+            onClick={login}
+            style={{
+              backgroundColor: "#1976d2",
+              color: "#fff",
+              padding: "12px 20px",
+              fontSize: "1rem",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}
+          >
+            Login
+          </button>
+        </div>
       )}
     </div>
   );
