@@ -66,7 +66,7 @@ export default function GenerateSchedule() {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
-        generateSchedule("2025-06-03", 30); // start from new date
+        generateSchedule("2025-06-02", 30); // start from new date
       }
     });
 
