@@ -10,7 +10,6 @@ import { db } from "./firebase";
 import NominateAlbum from "./NominateAlbum";
 import AlbumList from "./AlbumListNew";
 import ScheduleViewer from "./ScheduleViewer";
-import DeleteSchedule from "./DeleteSchedule";
 // import GenerateSchedule from "./GenerateSchedule"; // Use only if needed
 
 function App() {
@@ -107,7 +106,8 @@ function App() {
           <NominateAlbum />
           <AlbumList />
           <ScheduleViewer />
-          <DeleteSchedule />
+          {/* <GenerateSchedule /> */}
+          {/* <DeleteSchedule /> */}
         </>
       ) : (
         <div style={{ textAlign: "center", marginTop: "2rem" }}>

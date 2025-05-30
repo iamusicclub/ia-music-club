@@ -1,16 +1,15 @@
 import { useEffect } from "react";
 import { doc, setDoc } from "firebase/firestore";
-import { db, auth } from "./firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "./firebase";
 
 const members = [
+  { userId: "Z2FQNDa3UwRUVDTqWcSEDJA5kvp2", email: "mattdhodges@outlook.com" },
+  { userId: "uMKdZGXTnafAQtX4QN80ShBYRhh2", email: "davews1621@gmail.com" },
+  { userId: "4ssyOFngYaV6liJMn3qHwtzQzAD2", email: "jfield1968@gmail.com" },
   {
     userId: "UJyzC0IXFAbt4RLsfwbFB6u35kz1",
     email: "scottcee01@googlemail.com",
   },
-  { userId: "Z2FQNDa3UwRUVDTqWcSEDJA5kvp2", email: "mattdhodges@outlook.com" },
-  { userId: "uMKdZGXTnafAQtX4QN80ShBYRhh2", email: "davews1621@gmail.com" },
-  { userId: "4ssyOFngYaV6liJMn3qHwtzQzAD2", email: "jfield1968@gmail.com" },
 ];
 
 const ukBankHolidays = [
@@ -25,7 +24,15 @@ const ukBankHolidays = [
 ];
 
 const generateSchedule = async (startDateStr, daysToAssign = 30) => {
+  const user = auth.currentUser;
+  if (!user) {
+    console.warn("🔒 Not authenticated. Log in to generate schedule.");
+    return;
+  }
+
+  console.log(`🔐 Authenticated as ${user.email}`);
   console.log("🚀 Starting schedule generation...");
+
   const holidays = new Set(ukBankHolidays);
   let current = new Date(startDateStr);
   let assignedDays = 0;
@@ -55,24 +62,21 @@ const generateSchedule = async (startDateStr, daysToAssign = 30) => {
   console.log("🎉 Schedule generation complete.");
 };
 
-export default function GenerateSchedule({ user }) {
+export default function GenerateSchedule() {
   useEffect(() => {
-    if (user) {
-      console.log("🔐 Authenticated as", user.email);
-      generateSchedule("2025-06-02", 30);
-    } else {
-      console.warn("🔒 Not authenticated. Log in to generate schedule.");
-    }
-  }, [user]);
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        generateSchedule("2025-06-03", 30); // start from new date
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   return (
-    <div style={{ padding: "1rem", background: "#f8f8f8" }}>
+    <div style={{ padding: "1rem", background: "#f0f8ff" }}>
       <h3>📅 Generating Nomination Schedule</h3>
-      <p>
-        {user
-          ? "Generating…"
-          : "Login required. Check the console and Firestore."}
-      </p>
+      <p>Login required. Check the console and Firestore.</p>
     </div>
   );
 }
