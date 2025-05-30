@@ -4,13 +4,27 @@ import {
   signInWithEmailAndPassword,
   onAuthStateChanged,
   signOut,
+  setPersistence,
+  browserLocalPersistence,
 } from "firebase/auth";
 import NominateAlbum from "./NominateAlbum";
-import albumlist from "./albumlist";
+import AlbumList from "./AlbumList"; // Ensure correct case
 
 function App() {
   const [user, setUser] = useState(null);
 
+  // Enable persistent login
+  useEffect(() => {
+    setPersistence(auth, browserLocalPersistence)
+      .then(() => {
+        console.log("🔒 Persistent login enabled");
+      })
+      .catch((error) => {
+        console.error("❌ Persistence error:", error.message);
+      });
+  }, []);
+
+  // Auth listener
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsub();
@@ -36,7 +50,7 @@ function App() {
         <>
           <p>Hello, {user.email}</p>
           <NominateAlbum />
-          <albumlist />
+          <AlbumList />
           <button onClick={logout}>Logout</button>
         </>
       ) : (
