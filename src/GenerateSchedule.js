@@ -1,7 +1,8 @@
 import { useEffect } from "react";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
+// List of rotation members
 const members = [
   { userId: "Z2FQNDa3UwRUVDTqWcSEDJA5kvp2", email: "mattdhodges@outlook.com" },
   { userId: "uMKdZGXTnafAQtX4QN80ShBYRhh2", email: "davews1621@gmail.com" },
@@ -12,6 +13,7 @@ const members = [
   },
 ];
 
+// UK bank holidays in 2025
 const ukBankHolidays = [
   "2025-01-01",
   "2025-04-18",
@@ -23,6 +25,7 @@ const ukBankHolidays = [
   "2025-12-26",
 ];
 
+// Main generation logic
 const generateSchedule = async (startDateStr, daysToAssign = 30) => {
   const user = auth.currentUser;
   if (!user) {
@@ -42,18 +45,35 @@ const generateSchedule = async (startDateStr, daysToAssign = 30) => {
     const dateStr = current.toISOString().split("T")[0];
     const isWeekend = [0, 6].includes(current.getDay());
     const isHoliday = holidays.has(dateStr);
+    const isFriday = current.getDay() === 5;
 
     if (!isWeekend && !isHoliday) {
-      const member = members[i % members.length];
       const ref = doc(db, "nominationsSchedule", dateStr);
-      await setDoc(ref, {
-        userId: member.userId,
-        userEmail: member.email,
-        assignedAt: new Date().toISOString(),
-      });
-      console.log(`✅ Assigned ${dateStr} → ${member.email}`);
-      assignedDays++;
-      i++;
+
+      if (isFriday) {
+        // 🟦 Reserve Friday for New Music Friday
+        await setDoc(ref, {
+          userEmail: "New Music Friday 🎧",
+          note: "Enjoy the latest releases today!",
+          links: [
+            "https://en.wikipedia.org/wiki/List_of_2025_albums#May",
+            "https://www.albumoftheyear.org/releases/this-week/",
+          ],
+          assignedAt: serverTimestamp(),
+        });
+        console.log(`🎵 Reserved ${dateStr} for New Music Friday`);
+      } else {
+        // Assign a real member
+        const member = members[i % members.length];
+        await setDoc(ref, {
+          userId: member.userId,
+          userEmail: member.email,
+          assignedAt: serverTimestamp(),
+        });
+        console.log(`✅ Assigned ${dateStr} → ${member.email}`);
+        i++;
+        assignedDays++;
+      }
     }
 
     current.setDate(current.getDate() + 1);
@@ -62,11 +82,12 @@ const generateSchedule = async (startDateStr, daysToAssign = 30) => {
   console.log("🎉 Schedule generation complete.");
 };
 
+// React component to trigger generation on login
 export default function GenerateSchedule() {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
-        generateSchedule("2025-06-02", 30); // start from new date
+        generateSchedule("2025-06-02", 30); // Start date & number of assignments
       }
     });
 
@@ -80,3 +101,4 @@ export default function GenerateSchedule() {
     </div>
   );
 }
+
