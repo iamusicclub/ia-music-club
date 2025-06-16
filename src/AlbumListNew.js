@@ -17,6 +17,7 @@ export default function AlbumList() {
   const [minRating, setMinRating] = useState(0);
   const [nominators, setNominators] = useState([]);
   const [selectedNominator, setSelectedNominator] = useState("All");
+  const [sortOrder, setSortOrder] = useState("newest");
 
   // Load albums
   useEffect(() => {
@@ -27,14 +28,7 @@ export default function AlbumList() {
         ...doc.data(),
       }));
 
-      // Sort newest first
-      albumData.sort((a, b) => {
-        const dateA = a.nominationDate?.toDate?.() || new Date(0);
-        const dateB = b.nominationDate?.toDate?.() || new Date(0);
-        return dateB - dateA;
-      });
-
-      // Extract nominators
+      // Extract unique nominators
       const uniqueNominators = Array.from(
         new Set(albumData.map((a) => a.nominatedBy))
       ).filter(Boolean);
@@ -109,7 +103,8 @@ export default function AlbumList() {
     }
   };
 
-  const filteredAlbums = albums
+  // Apply filters and sorting
+  const filteredAndSorted = albums
     .filter((album) => {
       const avg = ratingsByAlbum[album.id];
       return avg === undefined || Number(avg) >= minRating;
@@ -118,14 +113,25 @@ export default function AlbumList() {
       selectedNominator === "All"
         ? true
         : album.nominatedBy === selectedNominator
-    );
+    )
+    .sort((a, b) => {
+      if (sortOrder === "rating") {
+        const avgA = parseFloat(ratingsByAlbum[a.id] || 0);
+        const avgB = parseFloat(ratingsByAlbum[b.id] || 0);
+        return avgB - avgA;
+      } else {
+        const dateA = a.nominationDate?.toDate?.() || new Date(0);
+        const dateB = b.nominationDate?.toDate?.() || new Date(0);
+        return dateB - dateA;
+      }
+    });
 
   return (
     <div style={{ marginTop: "2rem" }}>
       <h2>🎧 Album Nominations</h2>
 
-      <div style={{ marginBottom: "1rem", display: "flex", gap: "1rem" }}>
-        {/* Minimum Rating Filter */}
+      <div style={{ marginBottom: "1rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+        {/* Rating Filter */}
         <label>
           Min Avg Rating:
           <select
@@ -157,125 +163,138 @@ export default function AlbumList() {
             ))}
           </select>
         </label>
+
+        {/* Sort Option */}
+        <label>
+          Sort by:
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            style={{ marginLeft: "0.5rem" }}
+          >
+            <option value="newest">Newest First</option>
+            <option value="rating">Highest Rated</option>
+          </select>
+        </label>
       </div>
 
-      {filteredAlbums.length === 0 && <p>No albums match this filter.</p>}
-
-      {filteredAlbums.map((album) => (
-        <div
-          key={album.id}
-          style={{
-            border: "1px solid #ccc",
-            borderRadius: "10px",
-            padding: "16px",
-            marginBottom: "16px",
-            display: "flex",
-            alignItems: "flex-start",
-            backgroundColor: "#fff",
-          }}
-        >
-          {/* Album Cover */}
-          {album.coverUrl ? (
-            <img
-              src={album.coverUrl}
-              alt={`${album.title} cover`}
-              style={{
-                width: "100px",
-                height: "100px",
-                objectFit: "cover",
-                marginRight: "20px",
-                borderRadius: "8px",
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                width: "100px",
-                height: "100px",
-                backgroundColor: "#eee",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "12px",
-                color: "#888",
-                borderRadius: "8px",
-                marginRight: "20px",
-              }}
-            >
-              No Image
-            </div>
-          )}
-
-          {/* Album Info */}
-          <div style={{ flex: 1 }}>
-            <h3 style={{ margin: "0 0 4px 0" }}>{album.title}</h3>
-            <p style={{ margin: 0, color: "#555" }}>by {album.artist}</p>
-
-            {ratingsByAlbum[album.id] ? (
-              <p style={{ margin: "6px 0", fontWeight: "bold" }}>
-                ⭐ {ratingsByAlbum[album.id]} / 10
-              </p>
+      {filteredAndSorted.length === 0 ? (
+        <p>No albums match this filter.</p>
+      ) : (
+        filteredAndSorted.map((album) => (
+          <div
+            key={album.id}
+            style={{
+              border: "1px solid #ccc",
+              borderRadius: "10px",
+              padding: "16px",
+              marginBottom: "16px",
+              display: "flex",
+              alignItems: "flex-start",
+              backgroundColor: "#fff",
+            }}
+          >
+            {album.coverUrl ? (
+              <img
+                src={album.coverUrl}
+                alt={`${album.title} cover`}
+                style={{
+                  width: "100px",
+                  height: "100px",
+                  objectFit: "cover",
+                  marginRight: "20px",
+                  borderRadius: "8px",
+                }}
+              />
             ) : (
-              <p style={{ margin: "6px 0", color: "#888" }}>No ratings yet</p>
-            )}
-
-            <label>
-              Your rating:{" "}
-              <select
-                value={ratings[album.id] || ""}
-                onChange={(e) => handleRate(album.id, e.target.value)}
-                style={{ padding: "4px", marginLeft: "4px" }}
+              <div
+                style={{
+                  width: "100px",
+                  height: "100px",
+                  backgroundColor: "#eee",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "12px",
+                  color: "#888",
+                  borderRadius: "8px",
+                  marginRight: "20px",
+                }}
               >
-                <option value="">--</option>
-                {[...Array(10)].map((_, i) => (
-                  <option key={i + 1} value={i + 1}>
-                    {i + 1}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {feedback[album.id] && (
-              <div style={{ color: "green", marginTop: "4px" }}>
-                {feedback[album.id]}
+                No Image
               </div>
             )}
 
-            <div style={{ marginTop: "8px" }}>
-              {allRatings
-                .filter((r) => r.albumId === album.id)
-                .map((r) => (
-                  <div
-                    key={r.userId}
-                    style={{ fontSize: "0.85em", marginBottom: "4px" }}
-                  >
-                    {r.username || r.userEmail} rated {r.score}/10
-                    {r.comment && (
-                      <span
-                        style={{ fontStyle: "italic", marginLeft: "6px" }}
-                      >
-                        “{r.comment}”
-                      </span>
-                    )}
-                  </div>
-                ))}
-            </div>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ margin: "0 0 4px 0" }}>{album.title}</h3>
+              <p style={{ margin: 0, color: "#555" }}>by {album.artist}</p>
 
-            <div
-              style={{ marginTop: "10px", fontSize: "0.8em", color: "#555" }}
-            >
-              Nominated by: <code>{album.nominatedBy}</code>
-              <br />
-              {album.nominationDate?.toDate?.() && (
-                <>
-                  Nominated on:{" "}
-                  {album.nominationDate.toDate().toLocaleDateString()}
-                </>
+              {ratingsByAlbum[album.id] ? (
+                <p style={{ margin: "6px 0", fontWeight: "bold" }}>
+                  ⭐ {ratingsByAlbum[album.id]} / 10
+                </p>
+              ) : (
+                <p style={{ margin: "6px 0", color: "#888" }}>No ratings yet</p>
               )}
+
+              <label>
+                Your rating:{" "}
+                <select
+                  value={ratings[album.id] || ""}
+                  onChange={(e) => handleRate(album.id, e.target.value)}
+                  style={{ padding: "4px", marginLeft: "4px" }}
+                >
+                  <option value="">--</option>
+                  {[...Array(10)].map((_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {i + 1}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {feedback[album.id] && (
+                <div style={{ color: "green", marginTop: "4px" }}>
+                  {feedback[album.id]}
+                </div>
+              )}
+
+              <div style={{ marginTop: "8px" }}>
+                {allRatings
+                  .filter((r) => r.albumId === album.id)
+                  .map((r) => (
+                    <div
+                      key={r.userId}
+                      style={{ fontSize: "0.85em", marginBottom: "4px" }}
+                    >
+                      {r.username || r.userEmail} rated {r.score}/10
+                      {r.comment && (
+                        <span
+                          style={{ fontStyle: "italic", marginLeft: "6px" }}
+                        >
+                          “{r.comment}”
+                        </span>
+                      )}
+                    </div>
+                  ))}
+              </div>
+
+              <div
+                style={{ marginTop: "10px", fontSize: "0.8em", color: "#555" }}
+              >
+                Nominated by: <code>{album.nominatedBy}</code>
+                <br />
+                {album.nominationDate?.toDate?.() && (
+                  <>
+                    Nominated on:{" "}
+                    {album.nominationDate.toDate().toLocaleDateString()}
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        ))
+      )}
     </div>
   );
 }
