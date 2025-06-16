@@ -7,13 +7,18 @@ import {
   setPersistence,
   browserLocalPersistence,
 } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "./firebase";
+
 import NominateAlbum from "./NominateAlbum";
-import AlbumList from "./AlbumList"; // Ensure correct case
+import AlbumList from "./AlbumList";
+import ScheduleViewer from "./ScheduleViewer";
 
 function App() {
   const [user, setUser] = useState(null);
+  const [todaysNominator, setTodaysNominator] = useState(null);
 
-  // Enable persistent login
+  // Enable persistent login on initial mount
   useEffect(() => {
     setPersistence(auth, browserLocalPersistence)
       .then(() => {
@@ -24,12 +29,35 @@ function App() {
       });
   }, []);
 
-  // Auth listener
+  // Auth state listener
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
-    return () => unsub();
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsubscribe();
   }, []);
 
+  // Fetch today's nominator
+  useEffect(() => {
+    const fetchTodaysNominator = async () => {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const ref = doc(db, "nominationsSchedule", todayStr);
+      const snap = await getDoc(ref);
+
+      if (snap.exists()) {
+        const data = snap.data();
+        setTodaysNominator(
+          data.userEmail === "New Music Friday 🎧"
+            ? "🎧 New Music Friday"
+            : data.userEmail
+        );
+      } else {
+        setTodaysNominator("No nomination scheduled today");
+      }
+    };
+
+    fetchTodaysNominator();
+  }, []);
+
+  // Login flow
   const login = async () => {
     const email = prompt("Enter your email");
     const password = prompt("Enter your password");
@@ -40,18 +68,27 @@ function App() {
     }
   };
 
+  // Logout
   const logout = async () => {
     await signOut(auth);
   };
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
+      <h2>🎤 Today's Nominator</h2>
+      <p>
+        <strong>{todaysNominator || "Loading..."}</strong>
+      </p>
+
       {user ? (
         <>
-          <p>Hello, {user.email}</p>
+          <p style={{ marginBottom: "1rem" }}>Hello, {user.email}</p>
           <NominateAlbum />
           <AlbumList />
-          <button onClick={logout}>Logout</button>
+          <ScheduleViewer />
+          <button onClick={logout} style={{ marginTop: "1rem" }}>
+            Logout
+          </button>
         </>
       ) : (
         <button onClick={login}>Login</button>
@@ -61,3 +98,4 @@ function App() {
 }
 
 export default App;
+
