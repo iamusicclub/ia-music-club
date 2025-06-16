@@ -15,7 +15,8 @@ export default function AlbumList() {
   const [allRatings, setAllRatings] = useState([]);
   const [feedback, setFeedback] = useState({});
   const [minRating, setMinRating] = useState(0);
-  const [sortBy, setSortBy] = useState("date"); // "date" or "rating"
+  const [nominators, setNominators] = useState([]);
+  const [selectedNominator, setSelectedNominator] = useState("All");
 
   // Load albums
   useEffect(() => {
@@ -25,8 +26,23 @@ export default function AlbumList() {
         id: doc.id,
         ...doc.data(),
       }));
+
+      // Sort newest first
+      albumData.sort((a, b) => {
+        const dateA = a.nominationDate?.toDate?.() || new Date(0);
+        const dateB = b.nominationDate?.toDate?.() || new Date(0);
+        return dateB - dateA;
+      });
+
+      // Extract nominators
+      const uniqueNominators = Array.from(
+        new Set(albumData.map((a) => a.nominatedBy))
+      ).filter(Boolean);
+
       setAlbums(albumData);
+      setNominators(uniqueNominators);
     });
+
     return () => unsubscribe();
   }, []);
 
@@ -93,39 +109,29 @@ export default function AlbumList() {
     }
   };
 
-  const sortedAlbums = [...albums]
+  const filteredAlbums = albums
     .filter((album) => {
       const avg = ratingsByAlbum[album.id];
       return avg === undefined || Number(avg) >= minRating;
     })
-    .sort((a, b) => {
-      if (sortBy === "rating") {
-        const ratingA = parseFloat(ratingsByAlbum[a.id]) || 0;
-        const ratingB = parseFloat(ratingsByAlbum[b.id]) || 0;
-        return ratingB - ratingA;
-      } else {
-        const dateA = a.nominationDate?.toDate?.() || new Date(0);
-        const dateB = b.nominationDate?.toDate?.() || new Date(0);
-        return dateB - dateA;
-      }
-    });
+    .filter((album) =>
+      selectedNominator === "All"
+        ? true
+        : album.nominatedBy === selectedNominator
+    );
 
   return (
     <div style={{ marginTop: "2rem" }}>
       <h2>🎧 Album Nominations</h2>
 
-      <div style={{ marginBottom: "1rem" }}>
-        <label style={{ marginRight: "1rem" }}>
-          Filter by minimum average rating:{" "}
+      <div style={{ marginBottom: "1rem", display: "flex", gap: "1rem" }}>
+        {/* Minimum Rating Filter */}
+        <label>
+          Min Avg Rating:
           <select
             value={minRating}
             onChange={(e) => setMinRating(Number(e.target.value))}
-            style={{
-              padding: "6px",
-              borderRadius: "4px",
-              border: "1px solid #ccc",
-              marginRight: "1rem",
-            }}
+            style={{ marginLeft: "0.5rem" }}
           >
             {[0, 5, 6, 7, 8, 9].map((r) => (
               <option key={r} value={r}>
@@ -135,26 +141,27 @@ export default function AlbumList() {
           </select>
         </label>
 
+        {/* Nominator Filter */}
         <label>
-          Sort by:{" "}
+          Nominator:
           <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            style={{
-              padding: "6px",
-              borderRadius: "4px",
-              border: "1px solid #ccc",
-            }}
+            value={selectedNominator}
+            onChange={(e) => setSelectedNominator(e.target.value)}
+            style={{ marginLeft: "0.5rem" }}
           >
-            <option value="date">Most Recent</option>
-            <option value="rating">Highest Rated</option>
+            <option value="All">All</option>
+            {nominators.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
           </select>
         </label>
       </div>
 
-      {sortedAlbums.length === 0 && <p>No nominations found.</p>}
+      {filteredAlbums.length === 0 && <p>No albums match this filter.</p>}
 
-      {sortedAlbums.map((album) => (
+      {filteredAlbums.map((album) => (
         <div
           key={album.id}
           style={{
@@ -167,6 +174,7 @@ export default function AlbumList() {
             backgroundColor: "#fff",
           }}
         >
+          {/* Album Cover */}
           {album.coverUrl ? (
             <img
               src={album.coverUrl}
@@ -198,6 +206,7 @@ export default function AlbumList() {
             </div>
           )}
 
+          {/* Album Info */}
           <div style={{ flex: 1 }}>
             <h3 style={{ margin: "0 0 4px 0" }}>{album.title}</h3>
             <p style={{ margin: 0, color: "#555" }}>by {album.artist}</p>
@@ -261,19 +270,6 @@ export default function AlbumList() {
                 <>
                   Nominated on:{" "}
                   {album.nominationDate.toDate().toLocaleDateString()}
-                  <br />
-                  {(() => {
-                    const todayStr = new Date().toISOString().split("T")[0];
-                    const albumDate = album.nominationDate
-                      ?.toDate?.()
-                      ?.toISOString()
-                      .split("T")[0];
-                    return albumDate === todayStr ? (
-                      <span style={{ color: "green", fontWeight: "bold" }}>
-                        🆕 Nominated Today
-                      </span>
-                    ) : null;
-                  })()}
                 </>
               )}
             </div>
