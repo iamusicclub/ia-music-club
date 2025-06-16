@@ -4,17 +4,29 @@ import {
   signInWithEmailAndPassword,
   onAuthStateChanged,
   signOut,
+  setPersistence,
+  browserLocalPersistence,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "./firebase";
 import NominateAlbum from "./NominateAlbum";
 import AlbumList from "./AlbumListNew";
 import ScheduleViewer from "./ScheduleViewer";
-// import GenerateSchedule from "./GenerateSchedule"; // Use only if needed
 
 function App() {
   const [user, setUser] = useState(null);
   const [todaysNominator, setTodaysNominator] = useState(null);
+
+  // Enable persistent login across sessions
+  useEffect(() => {
+    setPersistence(auth, browserLocalPersistence)
+      .then(() => {
+        console.log("✅ Persistent login enabled");
+      })
+      .catch((error) => {
+        console.error("❌ Persistence setup error:", error.message);
+      });
+  }, []);
 
   // Track auth state
   useEffect(() => {
