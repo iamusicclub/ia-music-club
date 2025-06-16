@@ -43,37 +43,37 @@ const generateSchedule = async (startDateStr, daysToAssign = 30) => {
 
   while (assignedDays < daysToAssign) {
     const dateStr = current.toISOString().split("T")[0];
-    const isWeekend = [0, 6].includes(current.getDay());
+    const dayOfWeek = current.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     const isHoliday = holidays.has(dateStr);
-    const isFriday = current.getDay() === 5;
 
     if (!isWeekend && !isHoliday) {
       const ref = doc(db, "nominationsSchedule", dateStr);
 
-      if (isFriday) {
-        // 🟦 Reserve Friday for New Music Friday
+      if (dayOfWeek === 5) {
+        // Friday → New Music Friday
         await setDoc(ref, {
           userEmail: "New Music Friday 🎧",
-          note: "Enjoy the latest releases today!",
           links: [
             "https://en.wikipedia.org/wiki/List_of_2025_albums#May",
             "https://www.albumoftheyear.org/releases/this-week/",
           ],
-          assignedAt: serverTimestamp(),
+          assignedAt: new Date().toISOString(),
         });
-        console.log(`🎵 Reserved ${dateStr} for New Music Friday`);
+        console.log(`🎧 Assigned ${dateStr} → New Music Friday`);
       } else {
-        // Assign a real member
+        // Normal weekday
         const member = members[i % members.length];
         await setDoc(ref, {
           userId: member.userId,
           userEmail: member.email,
-          assignedAt: serverTimestamp(),
+          assignedAt: new Date().toISOString(),
         });
         console.log(`✅ Assigned ${dateStr} → ${member.email}`);
         i++;
-        assignedDays++;
       }
+
+      assignedDays++;
     }
 
     current.setDate(current.getDate() + 1);
@@ -81,6 +81,7 @@ const generateSchedule = async (startDateStr, daysToAssign = 30) => {
 
   console.log("🎉 Schedule generation complete.");
 };
+
 
 // React component to trigger generation on login
 export default function GenerateSchedule() {
