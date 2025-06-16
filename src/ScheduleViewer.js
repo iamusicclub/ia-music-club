@@ -51,41 +51,53 @@ export default function ScheduleViewer() {
         <p>No upcoming nominations found.</p>
       ) : (
         <ul style={{ listStyleType: "none", paddingLeft: 0 }}>
-          {schedule.map((item) => (
-            <li
-              key={item.date}
-              style={{
-                marginBottom: "1rem",
-                backgroundColor:
-                  item.userEmail === "New Music Friday 🎧" ? "#eef7ff" : "",
-                padding: "0.5rem",
-                borderRadius: "6px",
-              }}
-            >
-              <strong>{item.date}</strong> —{" "}
-              {item.userEmail === "New Music Friday 🎧" ? (
-                <>
-                  <span style={{ fontWeight: "bold", color: "#0077cc" }}>
-                    New Music Friday 🎧
-                  </span>
-                  <div style={{ marginTop: "0.3rem", fontSize: "0.9em" }}>
-                    {item.links?.map((url, index) => (
-                      <div key={index}>
-                        🔗{" "}
-                        <a href={url} target="_blank" rel="noopener noreferrer">
-                          {url}
-                        </a>
-                      </div>
-                    ))}
+          {schedule.map((item) => {
+            const isFriday = item.userEmail === "New Music Friday 🎧";
+            return (
+              <li
+                key={item.date}
+                style={{
+                  marginBottom: "1rem",
+                  padding: "0.75rem",
+                  borderRadius: "6px",
+                  backgroundColor: isFriday ? "#eef6ff" : "#fff",
+                  border: isFriday ? "1px solid #aad4ff" : "1px solid #ddd",
+                }}
+              >
+                <strong>{item.date}</strong> —{" "}
+                {isFriday ? (
+                  <div>
+                    <span style={{ fontWeight: "bold", color: "#0066cc" }}>
+                      🎧 New Music Friday
+                    </span>
+                    <div style={{ marginTop: "0.4rem", fontSize: "0.9em" }}>
+                      {item.links && item.links.length > 0 ? (
+                        item.links.map((url, index) => (
+                          <div key={index}>
+                            🔗{" "}
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {url}
+                            </a>
+                          </div>
+                        ))
+                      ) : (
+                        <em>No links provided</em>
+                      )}
+                    </div>
                   </div>
-                </>
-              ) : (
-                <span>{item.userEmail || "Unknown user"}</span>
-              )}
-            </li>
-          ))}
+                ) : (
+                  <span>{item.userEmail || "Unknown user"}</span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
   );
 }
+
