@@ -19,10 +19,7 @@ export default function ScheduleViewer() {
             date: doc.id,
             ...doc.data(),
           }))
-          .filter((entry) => {
-            // Include today and future dates only
-            return entry.date >= todayStr;
-          })
+          .filter((entry) => entry.date >= todayStr)
           .sort((a, b) => a.date.localeCompare(b.date));
 
         setSchedule(upcoming);
@@ -55,9 +52,36 @@ export default function ScheduleViewer() {
       ) : (
         <ul style={{ listStyleType: "none", paddingLeft: 0 }}>
           {schedule.map((item) => (
-            <li key={item.date} style={{ marginBottom: "0.5rem" }}>
+            <li
+              key={item.date}
+              style={{
+                marginBottom: "1rem",
+                backgroundColor:
+                  item.userEmail === "New Music Friday 🎧" ? "#eef7ff" : "",
+                padding: "0.5rem",
+                borderRadius: "6px",
+              }}
+            >
               <strong>{item.date}</strong> —{" "}
-              <span>{item.userEmail || "Unknown user"}</span>
+              {item.userEmail === "New Music Friday 🎧" ? (
+                <>
+                  <span style={{ fontWeight: "bold", color: "#0077cc" }}>
+                    New Music Friday 🎧
+                  </span>
+                  <div style={{ marginTop: "0.3rem", fontSize: "0.9em" }}>
+                    {item.links?.map((url, index) => (
+                      <div key={index}>
+                        🔗{" "}
+                        <a href={url} target="_blank" rel="noopener noreferrer">
+                          {url}
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <span>{item.userEmail || "Unknown user"}</span>
+              )}
             </li>
           ))}
         </ul>
