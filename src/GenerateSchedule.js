@@ -26,7 +26,7 @@ const ukBankHolidays = [
 ];
 
 // Main generation logic
-const generateSchedule = async (startDateStr, daysToAssign = 30) => {
+const generateSchedule = async (startDateStr, daysToAssign = 60) => {
   const user = auth.currentUser;
   if (!user) {
     console.warn("🔒 Not authenticated. Log in to generate schedule.");
