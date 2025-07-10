@@ -12,7 +12,6 @@ import { db } from "./firebase";
 import NominateAlbum from "./NominateAlbum";
 import AlbumList from "./AlbumListNew";
 import ScheduleViewer from "./ScheduleViewer";
-import GenerateSchedule from "./GenerateSchedule";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -119,7 +118,7 @@ function App() {
           <NominateAlbum />
           <AlbumList />
           <ScheduleViewer />
-         <GenerateSchedule />
+         {/* <GenerateSchedule /> */}
           {/* <DeleteSchedule /> */}
         </>
       ) : (
