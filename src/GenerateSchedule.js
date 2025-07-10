@@ -55,7 +55,7 @@ const generateSchedule = async (startDateStr, daysToAssign = 60) => {
         await setDoc(ref, {
           userEmail: "New Music Friday 🎧",
           links: [
-            "https://en.wikipedia.org/wiki/List_of_2025_albums#May",
+            "https://en.wikipedia.org/wiki/List_of_2025_albums",
             "https://www.albumoftheyear.org/releases/this-week/",
           ],
           assignedAt: new Date().toISOString(),
