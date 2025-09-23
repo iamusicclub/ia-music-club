@@ -64,8 +64,8 @@ const generateSchedule = async (startDateStr, daysToAssign = 60) => {
          await setDoc(ref, {
            userEmail: "New Music Friday 🎧",
            links: [
-             "https://nam10.safelinks.protection.outlook.com/?url=https%3A%2F%2Fen.wikipedia.org%2Fwiki%2FList_of_2025_albums%23May&data=05%7C02%7Cscott.coulter%40qbe.com%7C728ac4026e674dcf82a008ddfaa4a510%7Cce56fae6055d4c9fb6c99d341506a491%7C1%7C0%7C638942307236010800%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=67fQtUcgDTcLusd3orychM7v3kAj3StTFkix1KZjVQc%3D&reserved=0",
-             "https://nam10.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.albumoftheyear.org%2Freleases%2Fthis-week%2F&data=05%7C02%7Cscott.coulter%40qbe.com%7C728ac4026e674dcf82a008ddfaa4a510%7Cce56fae6055d4c9fb6c99d341506a491%7C1%7C0%7C638942307236033719%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=vLW%2B2tcTZAt91KoxRKzd9xd6gh0ZstE38BIPIOXoMaA%3D&reserved=0",
+             "https://en.wikipedia.org/wiki/List_of_2025_albums#May",
+             "https://www.albumoftheyear.org/releases/this-week/#google_vignette",
            ],
            assignedAt: new Date().toISOString(),
          });
@@ -111,6 +111,7 @@ export default function GenerateSchedule() {
    </div>
  );
 }
+
 
 
 
