@@ -119,7 +119,7 @@ function App() {
           <NominateAlbum />
           <AlbumList />
           <ScheduleViewer />
-        <GenerateSchedule />
+       {/* <GenerateSchedule /> */}
           {/* <DeleteSchedule /> */}
         </>
       ) : (
