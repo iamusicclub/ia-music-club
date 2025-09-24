@@ -120,8 +120,8 @@ function App() {
           <NominateAlbum />
           <AlbumList />
           <ScheduleViewer />
-       {/* <GenerateSchedule /> {/*
-         {/* <DeleteSchedule /> {/*
+        <GenerateSchedule /> 
+         {/* <DeleteSchedule /> */}
         </>
       ) : (
         <div style={{ textAlign: "center", marginTop: "2rem" }}>
