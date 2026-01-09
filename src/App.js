@@ -201,8 +201,7 @@ export default function App() {
             <>
               <ScheduleViewer />
 
-              {/* ✅ TEMP ONLY: keep while running schedule fixes, then remove */}
-              <GenerateSchedule />
+            
             </>
           ) : (
             <NewMusicRecommends />
