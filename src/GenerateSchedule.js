@@ -46,7 +46,7 @@ const MEMBERS = [
 const NEW_MUSIC_FRIDAY = {
   label: "New Music Friday 🎧",
   links: [
-    "https://en.wikipedia.org/wiki/List_of_2025_albums#May",
+    "https://en.wikipedia.org/wiki/List_of_2026_albums,
     "https://www.albumoftheyear.org/releases/this-week/",
   ],
 };
@@ -275,3 +275,4 @@ export default function GenerateSchedule() {
     </div>
   );
 }
+
