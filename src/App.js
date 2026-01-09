@@ -13,6 +13,9 @@ import NominateAlbum from "./NominateAlbum";
 import AlbumListNew from "./AlbumListNew";
 import ScheduleViewer from "./ScheduleViewer";
 import NewMusicRecommends from "./NewMusicRecommends";
+
+// ✅ Only keep this import while you are actively generating/patching schedules,
+// then remove it again.
 import GenerateSchedule from "./GenerateSchedule";
 
 function formatLondonDateKey(date = new Date()) {
@@ -32,7 +35,9 @@ function formatLondonDateKey(date = new Date()) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [todaysSchedule, setTodaysSchedule] = useState(null);
-  const [activeTab, setActiveTab] = useState("home"); // home | recommends
+
+  // home | schedule | recommends
+  const [activeTab, setActiveTab] = useState("home");
 
   const todayKey = useMemo(() => formatLondonDateKey(), []);
 
@@ -55,7 +60,9 @@ export default function App() {
       try {
         const ref = doc(db, "nominationsSchedule", todayKey);
         const snap = await getDoc(ref);
-        setTodaysSchedule(snap.exists() ? { date: todayKey, ...snap.data() } : null);
+        setTodaysSchedule(
+          snap.exists() ? { date: todayKey, ...snap.data() } : null
+        );
       } catch (e) {
         console.error("Failed to load today's schedule:", e?.message || e);
         setTodaysSchedule(null);
@@ -83,7 +90,7 @@ export default function App() {
 
   const isNewMusicFriday =
     todaysSchedule?.userEmail === "New Music Friday 🎧" ||
-    todaysSchedule?.type === "new_music_friday";
+    todaysSchedule?.type === "NEW_MUSIC_FRIDAY";
 
   return (
     <div className="container">
@@ -106,6 +113,12 @@ export default function App() {
             onClick={() => setActiveTab("home")}
           >
             Home
+          </button>
+          <button
+            className={activeTab === "schedule" ? "active" : ""}
+            onClick={() => setActiveTab("schedule")}
+          >
+            Schedule
           </button>
           <button
             className={activeTab === "recommends" ? "active" : ""}
@@ -143,8 +156,9 @@ export default function App() {
             Login
           </button>
         </div>
-      ) : activeTab === "home" ? (
+      ) : (
         <>
+          {/* Always show today’s nominator card (regardless of tab) */}
           <div className="card">
             <h2 style={{ margin: 0 }}>🎤 Today’s Nominator</h2>
             <p style={{ margin: "8px 0 0 0" }}>
@@ -174,17 +188,26 @@ export default function App() {
             </p>
           </div>
 
-          <div style={{ marginTop: 14 }}>
-            <NominateAlbum />
-          </div>
+          {/* Tab pages */}
+          {activeTab === "home" ? (
+            <>
+              <div style={{ marginTop: 14 }}>
+                <NominateAlbum />
+              </div>
 
-          <AlbumListNew />
+              <AlbumListNew />
+            </>
+          ) : activeTab === "schedule" ? (
+            <>
+              <ScheduleViewer />
 
-          <ScheduleViewer />
-        
+              {/* ✅ TEMP ONLY: keep while running schedule fixes, then remove */}
+              <GenerateSchedule />
+            </>
+          ) : (
+            <NewMusicRecommends />
+          )}
         </>
-      ) : (
-        <NewMusicRecommends />
       )}
     </div>
   );
