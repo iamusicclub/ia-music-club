@@ -10,76 +10,81 @@ import {
 } from "firebase/firestore";
 
 export default function NewMusicRecommends() {
+  const user = auth.currentUser;
+
   const [text, setText] = useState("");
   const [items, setItems] = useState([]);
 
   useEffect(() => {
     const qRecs = query(collection(db, "recommendations"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(qRecs, (snapshot) => {
-      const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setItems(data);
+    const unsub = onSnapshot(qRecs, (snap) => {
+      setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-
     return () => unsub();
   }, []);
 
   const submit = async (e) => {
     e.preventDefault();
-    const user = auth.currentUser;
-    if (!user) return alert("Please login first.");
-    if (!text.trim()) return;
+    if (!user) return;
 
-    try {
-      await addDoc(collection(db, "recommendations"), {
-        text: text.trim(),
-        userEmail: user.email || "Unknown",
-        createdAt: serverTimestamp(),
-      });
-      setText("");
-    } catch (e2) {
-      console.error(e2);
-      alert("Failed to save recommendation (check Firestore rules).");
-    }
+    const clean = text.trim();
+    if (!clean) return;
+
+    await addDoc(collection(db, "recommendations"), {
+      text: clean,
+      userEmail: user.email || "Unknown",
+      createdAt: serverTimestamp(),
+    });
+
+    setText("");
   };
 
   return (
     <div className="card">
-      <h3 style={{ marginTop: 0 }}>📝 New Music Recommends</h3>
-      <p className="muted">
-        A simple scrapbook: share a quick line about something new you recommend.
-        No ratings, no artwork, no track pulls.
+      <h2 style={{ marginTop: 0 }}>🗒️ New Music Recommends</h2>
+      <p className="smallNote" style={{ marginTop: 6 }}>
+        Use this like a scrapbook: add a one-liner recommendation. No ratings required.
       </p>
 
-      <form onSubmit={submit} className="form" style={{ gridTemplateColumns: "1fr auto" }}>
-        <label className="label" style={{ gridColumn: "1 / span 1" }}>
-          Recommendation
-          <input
-            className="input"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="e.g. ‘Maruja – Connla’s Well… absolutely wild post-punk.’"
-          />
-        </label>
-
-        <div style={{ alignSelf: "end" }}>
-          <button className="btn btn--primary" type="submit">
-            Add
-          </button>
-        </div>
+      <form onSubmit={submit} style={{ marginTop: 12 }}>
+        <div className="smallNote">Recommendation</div>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="e.g. Artist – Album: quick note on why it’s worth a listen…"
+        />
+        <button className="btn" type="submit" style={{ marginTop: 10 }}>
+          Add Recommendation
+        </button>
       </form>
 
-      <div style={{ marginTop: 14 }}>
-        {items.length === 0 ? (
-          <p>No recommendations yet.</p>
-        ) : (
-          items.map((it) => (
-            <div key={it.id} className="rec">
-              <div className="rec__text">{it.text}</div>
-              <div className="rec__meta muted">— {it.userEmail}</div>
-            </div>
-          ))
-        )}
-      </div>
+      <h3 className="sectionTitle">Recent entries</h3>
+      {items.length === 0 ? (
+        <p className="smallNote">No recommendations yet.</p>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {items.map((r) => {
+            const date =
+              r.createdAt?.toDate?.() ? r.createdAt.toDate().toLocaleString() : "";
+            return (
+              <div
+                key={r.id}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 14,
+                  padding: 12,
+                  background: "#fff",
+                }}
+              >
+                <div style={{ fontSize: 14 }}>{r.text}</div>
+                <div className="smallNote" style={{ marginTop: 6 }}>
+                  {r.userEmail || "Unknown"} {date ? `· ${date}` : ""}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
