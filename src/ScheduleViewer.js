@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { db } from "./firebase";
 import {
   collection,
-  getDocs,
-  orderBy,
+  onSnapshot,
   query,
   where,
-  FieldPath,
+  orderBy,
   limit,
+  documentId,
 } from "firebase/firestore";
 
 function formatLondonDateKey(date = new Date()) {
@@ -21,114 +21,129 @@ function formatLondonDateKey(date = new Date()) {
   const y = parts.find((p) => p.type === "year")?.value;
   const m = parts.find((p) => p.type === "month")?.value;
   const d = parts.find((p) => p.type === "day")?.value;
-  return `${y}-${m}-${d}`;
-}
 
-function isFriday(dateStr) {
-  // dateStr is YYYY-MM-DD; day-of-week is stable using UTC midnight.
-  const dt = new Date(`${dateStr}T00:00:00Z`);
-  return dt.getUTCDay() === 5;
+  return `${y}-${m}-${d}`;
 }
 
 export default function ScheduleViewer() {
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const todayKey = useMemo(() => formatLondonDateKey(), []);
+  const todayStr = useMemo(() => formatLondonDateKey(new Date()), []);
 
   useEffect(() => {
-    const fetchSchedule = async () => {
-      setLoading(true);
-      try {
-        // Efficient query by document id (date string)
-        const q = query(
-          collection(db, "nominationsSchedule"),
-          where(FieldPath.documentId(), ">=", todayKey),
-          orderBy(FieldPath.documentId(), "asc"),
-          limit(120)
-        );
+    setLoading(true);
+    setErrorMsg("");
 
-        const snapshot = await getDocs(q);
+    // Only upcoming schedule docs, ordered by date (doc id), limited for performance
+    const q = query(
+      collection(db, "nominationsSchedule"),
+      where(documentId(), ">=", todayStr),
+      orderBy(documentId()),
+      limit(200) // adjust if you want more shown
+    );
 
-        const upcoming = snapshot.docs
-          .map((d) => ({ date: d.id, ...d.data() }))
-          .sort((a, b) => a.date.localeCompare(b.date));
-
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        const upcoming = snapshot.docs.map((d) => ({
+          date: d.id,
+          ...d.data(),
+        }));
         setSchedule(upcoming);
-      } catch (err) {
-        console.error("❌ Failed to load nomination schedule:", err?.message || err);
-        setSchedule([]);
-      } finally {
+        setLoading(false);
+      },
+      (err) => {
+        console.error("❌ Failed to load nomination schedule:", err);
+        setErrorMsg(err?.message || "Failed to load schedule.");
         setLoading(false);
       }
-    };
+    );
 
-    fetchSchedule();
-  }, [todayKey]);
+    return () => unsub();
+  }, [todayStr]);
 
   return (
-    <div className="card" style={{ marginTop: 18 }}>
+    <div
+      style={{
+        marginTop: "2rem",
+        padding: "1rem",
+        borderTop: "1px solid #ccc",
+        backgroundColor: "#f9f9f9",
+        borderRadius: "8px",
+      }}
+    >
       <h3 style={{ marginTop: 0 }}>📅 Nomination Schedule</h3>
 
       {loading ? (
-        <p className="smallNote">Loading…</p>
+        <p>Loading…</p>
+      ) : errorMsg ? (
+        <div style={{ color: "#b00020" }}>
+          <p style={{ margin: 0, fontWeight: "bold" }}>Schedule failed to load.</p>
+          <p style={{ margin: "0.25rem 0 0 0" }}>{errorMsg}</p>
+          <p style={{ margin: "0.5rem 0 0 0", fontSize: "0.9em" }}>
+            If you see <code>Missing or insufficient permissions</code>, you must be logged in
+            because your Firestore rules require authentication for reading <code>nominationsSchedule</code>.
+          </p>
+        </div>
       ) : schedule.length === 0 ? (
-        <p className="smallNote">No upcoming nominations found.</p>
+        <div>
+          <p style={{ margin: 0 }}>No upcoming nominations found.</p>
+          <p style={{ margin: "0.5rem 0 0 0", fontSize: "0.9em", color: "#555" }}>
+            Checks:
+            <br />• Confirm Firestore has <code>nominationsSchedule</code> docs dated today or later.
+            <br />• If you just generated the schedule, this page should update automatically now.
+          </p>
+        </div>
       ) : (
         <ul style={{ listStyleType: "none", paddingLeft: 0, margin: 0 }}>
           {schedule.map((item) => {
-            // Force Fridays to show NMF, even if older docs still have a member assigned.
-            const friday = isFriday(item.date);
-            const isNMF =
-              item.userEmail === "New Music Friday 🎧" ||
-              item.type === "new_music_friday" ||
-              friday;
-
-            const links = item.links || [
-              "https://en.wikipedia.org/wiki/List_of_2025_albums#May",
-              "https://www.albumoftheyear.org/releases/this-week/",
-            ];
+            const isNewMusicFriday =
+              item.type === "NEW_MUSIC_FRIDAY" ||
+              item.userEmail === "New Music Friday 🎧";
 
             return (
               <li
                 key={item.date}
                 style={{
-                  marginBottom: "0.75rem",
+                  marginBottom: "1rem",
+                  backgroundColor: isNewMusicFriday ? "#eef7ff" : "#fff",
                   padding: "0.75rem",
-                  borderRadius: "12px",
-                  background: isNMF ? "var(--accent-weak)" : "#fff",
-                  border: "1px solid var(--border)",
+                  borderRadius: "8px",
+                  border: "1px solid #ddd",
                 }}
               >
-                <strong>{item.date}</strong> —{" "}
-                {isNMF ? (
-                  <div style={{ marginTop: 6 }}>
-                    <span className="badgeFriday">New Music Friday 🎧</span>
-                    <div className="smallNote" style={{ marginTop: 6 }}>
-                      {links.map((u, idx) => (
-                        <div key={idx}>
-                          🔗{" "}
-                          <a href={u} target="_blank" rel="noopener noreferrer">
-                            {u}
-                          </a>
-                        </div>
-                      ))}
-                      {!(
-                        item.userEmail === "New Music Friday 🎧" ||
-                        item.type === "new_music_friday"
-                      ) ? (
-                        <div style={{ marginTop: 6 }}>
-                          <em>
-                            Note: this date was previously assigned to{" "}
-                            {item.userEmail || "Unknown"} — regenerate schedule if you want
-                            Firestore to match Friday rules.
-                          </em>
-                        </div>
-                      ) : null}
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <strong>{item.date}</strong>
+                  <span style={{ color: "#666", fontSize: "0.9em" }}>
+                    {isNewMusicFriday ? "Friday" : ""}
+                  </span>
+                </div>
+
+                {isNewMusicFriday ? (
+                  <>
+                    <div style={{ marginTop: "0.4rem", fontWeight: "bold", color: "#0077cc" }}>
+                      New Music Friday 🎧
                     </div>
-                  </div>
+
+                    {Array.isArray(item.links) && item.links.length > 0 && (
+                      <div style={{ marginTop: "0.5rem", fontSize: "0.95em" }}>
+                        {item.links.map((url, idx) => (
+                          <div key={idx}>
+                            🔗{" "}
+                            <a href={url} target="_blank" rel="noopener noreferrer">
+                              {url}
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 ) : (
-                  <span>{item.userEmail || "Unknown user"}</span>
+                  <div style={{ marginTop: "0.4rem" }}>
+                    {item.userEmail || "Unknown user"}
+                  </div>
                 )}
               </li>
             );
