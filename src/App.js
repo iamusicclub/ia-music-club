@@ -13,6 +13,7 @@ import NominateAlbum from "./NominateAlbum";
 import AlbumListNew from "./AlbumListNew";
 import ScheduleViewer from "./ScheduleViewer";
 import NewMusicRecommends from "./NewMusicRecommends";
+import GenerateSchedule from "./GenerateSchedule";
 
 function formatLondonDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -180,6 +181,8 @@ export default function App() {
           <AlbumListNew />
 
           <ScheduleViewer />
+        
+<GenerateSchedule />
         </>
       ) : (
         <NewMusicRecommends />
