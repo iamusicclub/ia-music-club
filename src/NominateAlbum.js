@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { auth, db } from "./firebase";
-import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
 
 function formatLondonDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -13,7 +13,6 @@ function formatLondonDateKey(date = new Date()) {
   const y = parts.find((p) => p.type === "year")?.value;
   const m = parts.find((p) => p.type === "month")?.value;
   const d = parts.find((p) => p.type === "day")?.value;
-
   return `${y}-${m}-${d}`;
 }
 
@@ -24,22 +23,21 @@ async function fetchAlbumInfoFromLastFM(artist, album) {
   )}&album=${encodeURIComponent(album)}&format=json`;
 
   try {
-    const response = await fetch(url);
-    const data = await response.json();
+    const res = await fetch(url);
+    const data = await res.json();
 
-    const cover = data?.album?.image?.find((img) => img.size === "extralarge")?.["#text"] || "";
+    const image = data?.album?.image?.find((img) => img.size === "extralarge");
+    const coverUrl = image?.["#text"] || "";
 
-    // Track list can be array or single object depending on API payload
     const rawTracks = data?.album?.tracks?.track;
-    const tracksArr = Array.isArray(rawTracks) ? rawTracks : rawTracks ? [rawTracks] : [];
-
-    const tracks = tracksArr
+    const arr = Array.isArray(rawTracks) ? rawTracks : rawTracks ? [rawTracks] : [];
+    const tracks = arr
       .map((t) => (typeof t?.name === "string" ? t.name.trim() : ""))
       .filter(Boolean);
 
-    return { coverUrl: cover, tracks };
-  } catch (error) {
-    console.error("Failed to fetch album info from Last.fm", error);
+    return { coverUrl, tracks };
+  } catch (e) {
+    console.error("Last.fm album.getinfo failed:", e?.message || e);
     return { coverUrl: "", tracks: [] };
   }
 }
@@ -47,171 +45,126 @@ async function fetchAlbumInfoFromLastFM(artist, album) {
 export default function NominateAlbum() {
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
-  const [loading, setLoading] = useState(true);
 
-  // schedule checks
-  const [scheduleState, setScheduleState] = useState({
-    canNominate: false,
-    reason: "",
-    isNewMusicFriday: false,
-    links: [],
-  });
+  const [loading, setLoading] = useState(true);
+  const [canNominate, setCanNominate] = useState(false);
+  const [blockedReason, setBlockedReason] = useState("");
+
+  const todayKey = useMemo(() => formatLondonDateKey(), []);
+  const currentUser = auth.currentUser;
 
   useEffect(() => {
-    const run = async () => {
-      const user = auth.currentUser;
-      if (!user) {
+    const checkPermission = async () => {
+      setLoading(true);
+      setBlockedReason("");
+
+      try {
+        const ref = doc(db, "nominationsSchedule", todayKey);
+        const snap = await getDoc(ref);
+
+        if (!snap.exists()) {
+          setCanNominate(false);
+          setBlockedReason("No schedule found for today.");
+          return;
+        }
+
+        const data = snap.data();
+        const isNewMusicFriday =
+          data?.userEmail === "New Music Friday 🎧" || data?.type === "new_music_friday";
+
+        if (isNewMusicFriday) {
+          setCanNominate(false);
+          setBlockedReason("Today is New Music Friday — nominations are paused.");
+          return;
+        }
+
+        if (!currentUser) {
+          setCanNominate(false);
+          setBlockedReason("You are not logged in.");
+          return;
+        }
+
+        const ok = currentUser.uid === data.userId;
+        setCanNominate(ok);
+        if (!ok) setBlockedReason("You are not today's nominator.");
+      } catch (e) {
+        console.error("Failed to check nominator:", e?.message || e);
+        setCanNominate(false);
+        setBlockedReason("Failed to verify nominator status.");
+      } finally {
         setLoading(false);
-        setScheduleState({
-          canNominate: false,
-          reason: "Please login to nominate.",
-          isNewMusicFriday: false,
-          links: [],
-        });
-        return;
       }
-
-      const todayStr = formatLondonDateKey();
-      const ref = doc(db, "nominationsSchedule", todayStr);
-      const snap = await getDoc(ref);
-
-      if (!snap.exists()) {
-        setLoading(false);
-        setScheduleState({
-          canNominate: false,
-          reason: "No nominator scheduled for today (weekend/holiday).",
-          isNewMusicFriday: false,
-          links: [],
-        });
-        return;
-      }
-
-      const data = snap.data();
-
-      if (data.userEmail === "New Music Friday 🎧") {
-        setLoading(false);
-        setScheduleState({
-          canNominate: false,
-          reason: "Today is New Music Friday 🎧 (no album nomination).",
-          isNewMusicFriday: true,
-          links: data.links || [],
-        });
-        return;
-      }
-
-      const canNominate = user.uid === data.userId;
-      setLoading(false);
-      setScheduleState({
-        canNominate,
-        reason: canNominate ? "" : "You are not today's nominator.",
-        isNewMusicFriday: false,
-        links: [],
-      });
     };
 
-    run();
-  }, [auth.currentUser]);
+    checkPermission();
+  }, [todayKey, currentUser]);
 
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    const user = auth.currentUser;
+    if (!currentUser) return;
 
-    if (!user) {
-      alert("Please log in first.");
-      return;
-    }
-
-    if (!title.trim() || !artist.trim()) {
+    const cleanTitle = title.trim();
+    const cleanArtist = artist.trim();
+    if (!cleanTitle || !cleanArtist) {
       alert("Please enter album title and artist.");
       return;
     }
 
     try {
-      const { coverUrl, tracks } = await fetchAlbumInfoFromLastFM(artist.trim(), title.trim());
+      const { coverUrl, tracks } = await fetchAlbumInfoFromLastFM(cleanArtist, cleanTitle);
 
       await addDoc(collection(db, "albums"), {
-        title: title.trim(),
-        artist: artist.trim(),
+        title: cleanTitle,
+        artist: cleanArtist,
         coverUrl,
-        tracks, // ✅ store track listing so Home can display immediately
-        nominatedBy: user.email,
+        tracks, // ✅ store once at nomination time
+        nominatedBy: currentUser.email || "Unknown",
         nominationDate: serverTimestamp(),
       });
 
       setTitle("");
       setArtist("");
       alert("Album submitted!");
-    } catch (error) {
-      console.error("Submission error:", error.message);
+    } catch (e2) {
+      console.error("Album submission failed:", e2?.message || e2);
       alert("Failed to submit album.");
     }
   };
 
   if (loading) {
-    return (
-      <div className="card">
-        <h3>🎵 Nominate an Album</h3>
-        <p>Loading nomination permissions…</p>
-      </div>
-    );
+    return <div className="card">Loading nomination form…</div>;
   }
 
-  if (!scheduleState.canNominate) {
+  if (!canNominate) {
     return (
       <div className="card">
-        <h3>🎵 Nominate an Album</h3>
-        <p className="muted">{scheduleState.reason}</p>
-
-        {scheduleState.isNewMusicFriday && scheduleState.links?.length > 0 && (
-          <div className="nmf-box">
-            <div className="nmf-title">New Music Friday links</div>
-            {scheduleState.links.map((u) => (
-              <div key={u}>
-                🔗{" "}
-                <a href={u} target="_blank" rel="noreferrer">
-                  {u}
-                </a>
-              </div>
-            ))}
-          </div>
-        )}
+        <h3 style={{ marginTop: 0 }}>🎵 Nominate an Album</h3>
+        <p className="smallNote" style={{ marginTop: 6 }}>
+          {blockedReason || "You cannot nominate today."}
+        </p>
       </div>
     );
   }
 
   return (
     <div className="card">
-      <h3>🎵 Nominate an Album</h3>
+      <h3 style={{ marginTop: 0 }}>🎵 Nominate an Album</h3>
 
-      <form onSubmit={handleSubmit} className="form">
-        <label className="label">
-          Album Title
-          <input
-            className="input"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. OK Computer"
-            required
-          />
-        </label>
+      <form onSubmit={submit}>
+        <div style={{ display: "grid", gap: 10 }}>
+          <label>
+            <div className="smallNote">Album Title</div>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+          </label>
 
-        <label className="label">
-          Artist
-          <input
-            className="input"
-            value={artist}
-            onChange={(e) => setArtist(e.target.value)}
-            placeholder="e.g. Radiohead"
-            required
-          />
-        </label>
+          <label>
+            <div className="smallNote">Artist</div>
+            <input value={artist} onChange={(e) => setArtist(e.target.value)} required />
+          </label>
 
-        <button className="btn btn--primary" type="submit">
-          Submit Nomination
-        </button>
-
-        <div className="hint">
-          Artwork + track list are pulled automatically from Last.fm.
+          <button className="btn" type="submit" style={{ width: "fit-content" }}>
+            Submit Nomination
+          </button>
         </div>
       </form>
     </div>
