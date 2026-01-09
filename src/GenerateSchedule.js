@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { auth, db } from "./firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  collection,
+  getDocs,
+} from "firebase/firestore";
 
 /**
  * ===========================
@@ -18,14 +25,18 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
  * 2) "generate_range"
  *    - Generates a schedule range starting from START_DATE
  *    - Uses New Music Friday rules for Fridays
+ *
+ * 3) "fix_friday_links"
+ *    - Updates existing (future/today) NEW_MUSIC_FRIDAY docs in Firestore
+ *      so your UI reflects the new links immediately.
  */
-const MODE = "override_today_only"; // <-- set to "generate_range" when you actually want to generate schedules
+const MODE = "fix_friday_links"; // <-- set back to "override_today_only" or remove component after running
 
 // Used only when MODE === "generate_range"
 const START_DATE = "2025-06-02";
 const DAYS_TO_ASSIGN = 60;
 
-// Safety: if false, generator will NOT overwrite existing docs
+// Safety: if false, generator will NOT overwrite existing docs (generate_range only)
 const OVERWRITE_EXISTING = false;
 
 // Your “today override” identity (must match your Firebase Auth user)
@@ -39,14 +50,17 @@ const MEMBERS = [
   { userId: "Z2FQNDa3UwRUVDTqWcSEDJA5kvp2", email: "mattdhodges@outlook.com" },
   { userId: "uMKdZGXTnafAQtX4QN80ShBYRhh2", email: "davews1621@gmail.com" },
   { userId: "4ssyOFngYaV6liJMn3qHwtzQzAD2", email: "jfield1968@gmail.com" },
-  { userId: "UJyzC0IXFAbt4RLsfwbFB6u35kz1", email: "scottcee01@googlemail.com" },
+  {
+    userId: "UJyzC0IXFAbt4RLsfwbFB6u35kz1",
+    email: "scottcee01@googlemail.com",
+  },
 ];
 
-// Friday links
+// Friday links (FIXED: valid strings)
 const NEW_MUSIC_FRIDAY = {
   label: "New Music Friday 🎧",
   links: [
-    "https://en.wikipedia.org/wiki/List_of_2026_albums,
+    "https://en.wikipedia.org/wiki/List_of_2026_albums",
     "https://www.albumoftheyear.org/releases/this-week/",
   ],
 };
@@ -55,9 +69,6 @@ const NEW_MUSIC_FRIDAY = {
  * ===========================
  * BANK HOLIDAYS
  * ===========================
- * Notes:
- * - These are the common England & Wales style dates you’ve been using.
- * - If you want Scotland-specific holidays, we can extend this list.
  */
 const UK_BANK_HOLIDAYS_2025 = [
   "2025-01-01",
@@ -78,10 +89,13 @@ const UK_BANK_HOLIDAYS_2026 = [
   "2026-05-25", // Spring
   "2026-08-31", // Summer
   "2026-12-25",
-  "2026-12-28", // Boxing Day substitute day (since 26th is Saturday)
+  "2026-12-28", // Boxing Day substitute (26th Saturday)
 ];
 
-const UK_BANK_HOLIDAYS = new Set([...UK_BANK_HOLIDAYS_2025, ...UK_BANK_HOLIDAYS_2026]);
+const UK_BANK_HOLIDAYS = new Set([
+  ...UK_BANK_HOLIDAYS_2025,
+  ...UK_BANK_HOLIDAYS_2026,
+]);
 
 /**
  * ===========================
@@ -104,12 +118,9 @@ function formatLondonDateKey(date = new Date()) {
 }
 
 function londonDayOfWeek(dateStr) {
-  // dateStr is YYYY-MM-DD
-  // Construct a Date at noon UTC to avoid DST edge weirdness
   const [y, m, d] = dateStr.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-  // Get weekday in London via formatting trick
-  // 0=Sun..6=Sat
+
   const weekday = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/London",
     weekday: "short",
@@ -156,7 +167,11 @@ async function overrideTodayOnly() {
     assignedAt: new Date().toISOString(),
     override: true,
     overrideReason: "Testing track listing / today-only override",
-    note: dow === 5 ? "Override applied on Friday (New Music Friday bypassed)" : "Override applied",
+    note:
+      dow === 5
+        ? "Override applied on Friday (New Music Friday bypassed)"
+        : "Override applied",
+    type: "USER",
   });
 
   console.log(`✅ TODAY OVERRIDE: ${todayStr} → ${OVERRIDE_USER.email}`);
@@ -184,7 +199,6 @@ async function generateRange(startDateStr, daysToAssign) {
     const isHoliday = UK_BANK_HOLIDAYS.has(dateStr);
 
     if (!isWeekend && !isHoliday) {
-      // Friday = New Music Friday
       if (dow === 5) {
         const res = await writeScheduleDoc(dateStr, {
           userEmail: NEW_MUSIC_FRIDAY.label,
@@ -193,9 +207,9 @@ async function generateRange(startDateStr, daysToAssign) {
           type: "NEW_MUSIC_FRIDAY",
         });
 
-        if (!res.skipped) console.log(`🎧 Assigned ${dateStr} → New Music Friday`);
+        if (!res.skipped)
+          console.log(`🎧 Assigned ${dateStr} → New Music Friday`);
       } else {
-        // Normal weekday = rotate
         const member = MEMBERS[memberIndex % MEMBERS.length];
 
         const res = await writeScheduleDoc(dateStr, {
@@ -222,6 +236,56 @@ async function generateRange(startDateStr, daysToAssign) {
 
 /**
  * ===========================
+ * PATCH EXISTING NMF DOCS
+ * ===========================
+ * Updates the links on already-created Friday docs.
+ * This is what you need if the UI is still showing old URLs.
+ */
+async function fixFridayLinks() {
+  const user = auth.currentUser;
+  if (!user) {
+    console.warn("🔒 Not authenticated. Log in to apply fixes.");
+    return;
+  }
+
+  const todayStr = formatLondonDateKey(new Date());
+
+  console.log("🛠️ Patching existing New Music Friday docs...");
+  const snapshot = await getDocs(collection(db, "nominationsSchedule"));
+
+  let updated = 0;
+  let scanned = 0;
+
+  for (const d of snapshot.docs) {
+    scanned++;
+    const dateStr = d.id;
+    const data = d.data() || {};
+
+    // Only patch today/future docs
+    if (dateStr < todayStr) continue;
+
+    const isNmf =
+      data.type === "NEW_MUSIC_FRIDAY" || data.userEmail === NEW_MUSIC_FRIDAY.label;
+
+    if (!isNmf) continue;
+
+    const ref = doc(db, "nominationsSchedule", dateStr);
+    await updateDoc(ref, {
+      userEmail: NEW_MUSIC_FRIDAY.label,
+      links: NEW_MUSIC_FRIDAY.links,
+      patchedAt: new Date().toISOString(),
+      type: "NEW_MUSIC_FRIDAY",
+    });
+
+    updated++;
+    console.log(`✅ Patched ${dateStr} → updated New Music Friday links`);
+  }
+
+  console.log(`🎉 Patch complete. Scanned ${scanned} docs, updated ${updated}.`);
+}
+
+/**
+ * ===========================
  * REACT COMPONENT
  * ===========================
  */
@@ -239,11 +303,15 @@ export default function GenerateSchedule() {
         if (MODE === "override_today_only") {
           setStatus("Applying today-only override...");
           await overrideTodayOnly();
-          setStatus("✅ Today override written. You can now test nomination today.");
+          setStatus("✅ Today override written.");
         } else if (MODE === "generate_range") {
           setStatus("Generating schedule range...");
           await generateRange(START_DATE, DAYS_TO_ASSIGN);
           setStatus("✅ Schedule generated.");
+        } else if (MODE === "fix_friday_links") {
+          setStatus("Patching existing New Music Friday links...");
+          await fixFridayLinks();
+          setStatus("✅ New Music Friday links patched.");
         } else {
           setStatus("No action: MODE is not recognised.");
         }
@@ -257,7 +325,14 @@ export default function GenerateSchedule() {
   }, []);
 
   return (
-    <div style={{ marginTop: "1.5rem", padding: "1rem", background: "#f0f8ff", borderRadius: 8 }}>
+    <div
+      style={{
+        marginTop: "1.5rem",
+        padding: "1rem",
+        background: "#f0f8ff",
+        borderRadius: 8,
+      }}
+    >
       <h3 style={{ marginTop: 0 }}>📅 Schedule Tool</h3>
       <p style={{ margin: 0 }}>
         <strong>Mode:</strong> {MODE}
@@ -266,13 +341,14 @@ export default function GenerateSchedule() {
 
       <div style={{ marginTop: "0.75rem", fontSize: "0.9em", color: "#444" }}>
         <div>
-          <strong>Tip:</strong> Once your test is complete, remove &lt;GenerateSchedule /&gt; from App.js again.
+          <strong>Tip:</strong> After this runs successfully, remove{" "}
+          {"<GenerateSchedule />"} from App.js again.
         </div>
         <div>
-          <strong>Note:</strong> OVERWRITE_EXISTING is currently <code>{String(OVERWRITE_EXISTING)}</code>.
+          <strong>Note:</strong> OVERWRITE_EXISTING is{" "}
+          <code>{String(OVERWRITE_EXISTING)}</code> (generate_range only).
         </div>
       </div>
     </div>
   );
 }
-
