@@ -12,13 +12,9 @@ import { doc, getDoc } from "firebase/firestore";
 import NominateAlbum from "./NominateAlbum";
 import AlbumListNew from "./AlbumListNew";
 import ScheduleViewer from "./ScheduleViewer";
-import GenerateSchedule from "./GenerateSchedule";
 import NewMusicRecommends from "./NewMusicRecommends";
 
-import "./styles.css";
-
 function formatLondonDateKey(date = new Date()) {
-  // YYYY-MM-DD in Europe/London (avoids UTC off-by-one)
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/London",
     year: "numeric",
@@ -29,53 +25,44 @@ function formatLondonDateKey(date = new Date()) {
   const y = parts.find((p) => p.type === "year")?.value;
   const m = parts.find((p) => p.type === "month")?.value;
   const d = parts.find((p) => p.type === "day")?.value;
-
   return `${y}-${m}-${d}`;
 }
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [todaysSchedule, setTodaysSchedule] = useState(null);
-  const [activeTab, setActiveTab] = useState("home");
-  const [showAdminTools, setShowAdminTools] = useState(false);
+  const [activeTab, setActiveTab] = useState("home"); // home | recommends
 
-  const isAdmin = useMemo(() => {
-    const email = user?.email || "";
-    // ✅ Add any admin emails here
-    return ["scottcee01@googlemail.com"].includes(email);
-  }, [user]);
+  const todayKey = useMemo(() => formatLondonDateKey(), []);
 
-  // Enable persistent login across sessions (once logged in, they should stay logged in)
+  // Persist login (so users log in once, not daily)
   useEffect(() => {
-    setPersistence(auth, browserLocalPersistence)
-      .then(() => console.log("✅ Persistent login enabled"))
-      .catch((error) =>
-        console.error("❌ Persistence setup error:", error.message)
-      );
+    setPersistence(auth, browserLocalPersistence).catch((error) => {
+      console.error("❌ Persistence setup error:", error.message);
+    });
   }, []);
 
-  // Track auth state
+  // Auth tracking
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
-    return () => unsub();
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsubscribe();
   }, []);
 
-  // Fetch today's schedule doc
+  // Load today's schedule entry (for header)
   useEffect(() => {
-    const fetchToday = async () => {
+    const loadTodaySchedule = async () => {
       try {
-        const todayStr = formatLondonDateKey();
-        const ref = doc(db, "nominationsSchedule", todayStr);
+        const ref = doc(db, "nominationsSchedule", todayKey);
         const snap = await getDoc(ref);
-        setTodaysSchedule(snap.exists() ? { date: todayStr, ...snap.data() } : null);
+        setTodaysSchedule(snap.exists() ? { date: todayKey, ...snap.data() } : null);
       } catch (e) {
-        console.error("Failed to fetch today's schedule:", e?.message || e);
+        console.error("Failed to load today's schedule:", e?.message || e);
         setTodaysSchedule(null);
       }
     };
 
-    fetchToday();
-  }, [user]); // refetch after login too
+    loadTodaySchedule();
+  }, [todayKey]);
 
   const login = async () => {
     const email = prompt("Enter your email");
@@ -85,144 +72,118 @@ export default function App() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err) {
-      alert(err.message);
+      alert(err?.message || String(err));
     }
   };
 
   const logout = async () => {
     await signOut(auth);
-    setShowAdminTools(false);
-    setActiveTab("home");
   };
 
-  const renderTodaysNominator = () => {
-    // Friday/New Music Friday record can be stored as userEmail = "New Music Friday 🎧" + links
-    if (!todaysSchedule) {
-      return (
-        <div className="today-pill today-pill--muted">
-          No nominator scheduled for today (weekend/holiday)
-        </div>
-      );
-    }
-
-    const isNMF = todaysSchedule.userEmail === "New Music Friday 🎧";
-    if (!isNMF) {
-      return (
-        <div className="today-pill">
-          <span className="today-pill__label">Today’s nominator</span>
-          <span className="today-pill__value">{todaysSchedule.userEmail}</span>
-        </div>
-      );
-    }
-
-    return (
-      <div className="today-pill today-pill--nmf">
-        <div>
-          <span className="today-pill__label">Today</span>
-          <span className="today-pill__value">New Music Friday 🎧</span>
-        </div>
-        <div className="today-pill__links">
-          {(todaysSchedule.links || []).map((u) => (
-            <a key={u} href={u} target="_blank" rel="noreferrer">
-              {u}
-            </a>
-          ))}
-        </div>
-      </div>
-    );
-  };
+  const isNewMusicFriday =
+    todaysSchedule?.userEmail === "New Music Friday 🎧" ||
+    todaysSchedule?.type === "new_music_friday";
 
   return (
-    <div className="app">
-      <header className="topbar">
+    <div className="container">
+      <div className="topbar">
         <div className="brand">
-          <div className="brand__title">IA Music Club</div>
-          <div className="brand__sub">Nominate • Rate • Discuss</div>
+          <h1>IA Music Club</h1>
+          <div className="sub">
+            Today: <strong>{todayKey}</strong>{" "}
+            {isNewMusicFriday ? (
+              <span className="badgeFriday" style={{ marginLeft: 8 }}>
+                New Music Friday
+              </span>
+            ) : null}
+          </div>
         </div>
 
-        <div className="topbar__right">
-          {renderTodaysNominator()}
+        <div className="nav">
+          <button
+            className={activeTab === "home" ? "active" : ""}
+            onClick={() => setActiveTab("home")}
+          >
+            Home
+          </button>
+          <button
+            className={activeTab === "recommends" ? "active" : ""}
+            onClick={() => setActiveTab("recommends")}
+          >
+            New Music Recommends
+          </button>
+        </div>
 
+        <div className="authRow">
           {user ? (
-            <div className="authbox">
-              <span className="authbox__user">👋 {user.email}</span>
-              <button className="btn btn--primary" onClick={logout}>
+            <>
+              <span className="pill">👋 {user.email}</span>
+              <button className="btn secondary" onClick={logout}>
                 Logout
               </button>
-            </div>
+            </>
           ) : (
-            <button className="btn btn--primary" onClick={login}>
+            <button className="btn" onClick={login}>
               Login
             </button>
           )}
         </div>
-      </header>
+      </div>
 
-      <nav className="tabs">
-        <button
-          className={`tab ${activeTab === "home" ? "tab--active" : ""}`}
-          onClick={() => setActiveTab("home")}
-        >
-          Home
-        </button>
-        <button
-          className={`tab ${activeTab === "schedule" ? "tab--active" : ""}`}
-          onClick={() => setActiveTab("schedule")}
-        >
-          Schedule
-        </button>
-        <button
-          className={`tab ${activeTab === "recs" ? "tab--active" : ""}`}
-          onClick={() => setActiveTab("recs")}
-        >
-          New Music Recommends
-        </button>
-
-        {user && isAdmin && (
-          <button
-            className={`tab tab--admin ${showAdminTools ? "tab--active" : ""}`}
-            onClick={() => setShowAdminTools((s) => !s)}
-            title="Admin tools (schedule generation)"
-          >
-            Admin
+      {!user ? (
+        <div className="card">
+          <h2 style={{ marginTop: 0 }}>Sign in</h2>
+          <p className="smallNote" style={{ marginTop: 6 }}>
+            Your Firestore rules currently require authentication for reading/writing club data,
+            so users must log in at least once. With persistence enabled, they should stay logged
+            in on the same device/browser.
+          </p>
+          <button className="btn" onClick={login} style={{ marginTop: 10 }}>
+            Login
           </button>
-        )}
-      </nav>
-
-      <main className="main">
-        {!user ? (
-          <div className="card card--center">
-            <h2>Welcome</h2>
-            <p>Please login to view nominations, rate albums, and see the schedule.</p>
-            <button className="btn btn--primary" onClick={login}>
-              Login
-            </button>
+        </div>
+      ) : activeTab === "home" ? (
+        <>
+          <div className="card">
+            <h2 style={{ margin: 0 }}>🎤 Today’s Nominator</h2>
+            <p style={{ margin: "8px 0 0 0" }}>
+              {todaysSchedule ? (
+                isNewMusicFriday ? (
+                  <>
+                    <strong>New Music Friday 🎧</strong>
+                    <div className="smallNote" style={{ marginTop: 6 }}>
+                      Explore:
+                      <ul style={{ margin: "6px 0 0 18px" }}>
+                        {(todaysSchedule.links || []).map((u, idx) => (
+                          <li key={idx}>
+                            <a href={u} target="_blank" rel="noopener noreferrer">
+                              {u}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                ) : (
+                  <strong>{todaysSchedule.userEmail || "Unknown"}</strong>
+                )
+              ) : (
+                <strong>No nominator scheduled for today</strong>
+              )}
+            </p>
           </div>
-        ) : (
-          <>
-            {activeTab === "home" && (
-              <>
-                <NominateAlbum />
-                <AlbumListNew />
-              </>
-            )}
 
-            {activeTab === "schedule" && <ScheduleViewer />}
+          <div style={{ marginTop: 14 }}>
+            <NominateAlbum />
+          </div>
 
-            {activeTab === "recs" && <NewMusicRecommends />}
+          <AlbumListNew />
 
-            {showAdminTools && isAdmin && (
-              <div style={{ marginTop: "16px" }}>
-                <GenerateSchedule />
-              </div>
-            )}
-          </>
-        )}
-      </main>
-
-      <footer className="footer">
-        <span>Built with React • Firebase Auth • Firestore • Last.fm</span>
-      </footer>
+          <ScheduleViewer />
+        </>
+      ) : (
+        <NewMusicRecommends />
+      )}
     </div>
   );
 }
