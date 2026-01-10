@@ -1,13 +1,21 @@
+/* =========================
+   Global + Layout
+========================= */
+
 :root {
-  --bg: #f6f7fb;
+  --bg: #f5f7fb;
   --card: #ffffff;
   --text: #111827;
   --muted: #6b7280;
   --border: #e5e7eb;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   --radius: 14px;
-  --blue: #1976d2;
-  --blue-weak: #e8f1ff;
+
+  --btn: #1976d2;
+  --btnText: #ffffff;
+
+  --chip: #eef2ff;
+  --chipText: #1f3a8a;
 }
 
 * {
@@ -16,329 +24,352 @@
 
 html,
 body {
-  height: 100%;
-}
-
-body {
   margin: 0;
+  padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
-    "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
-    sans-serif;
-}
-
-img {
-  display: block;
-  max-width: 100%;
-  height: auto;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 a {
-  color: var(--blue);
+  color: #1d4ed8;
   text-decoration: none;
 }
 a:hover {
   text-decoration: underline;
 }
 
-/* -----------------------------
-   Layout
------------------------------ */
 .container {
   max-width: 980px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 18px;
 }
 
-/* Top bar */
-.topbar {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 14px;
-}
-
-.brand h1 {
-  margin: 0;
-  font-size: 20px;
-  letter-spacing: 0.2px;
-}
-
-.brand .sub {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-/* Tabs / nav */
-.nav {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.nav button {
-  appearance: none;
-  border: 1px solid var(--border);
+.card {
   background: var(--card);
-  padding: 8px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   box-shadow: var(--shadow);
-  white-space: nowrap;
+  padding: 14px;
 }
 
-.nav button.active {
-  border-color: rgba(25, 118, 210, 0.35);
-  background: var(--blue-weak);
-  font-weight: 600;
-}
-
-/* Auth row */
-.authRow {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  max-width: 100%;
+.smallNote {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.35;
 }
 
 .pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  background: var(--card);
+  background: #fff;
   border: 1px solid var(--border);
+  padding: 8px 10px;
   border-radius: 999px;
-  font-size: 13px;
-  color: var(--muted);
-  box-shadow: var(--shadow);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Buttons */
-.btn {
-  appearance: none;
-  border: none;
-  background: var(--blue);
-  color: #fff;
-  padding: 9px 14px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 600;
-  box-shadow: var(--shadow);
-  white-space: nowrap;
-}
-
-.btn.secondary {
-  background: #eef2f7;
-  color: #111827;
-  border: 1px solid var(--border);
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Cards */
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  box-shadow: var(--shadow);
-}
-
-.smallNote {
-  color: var(--muted);
-  font-size: 13px;
-}
-
-/* Badges */
 .badgeFriday {
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
   border-radius: 999px;
-  background: var(--blue-weak);
-  border: 1px solid rgba(25, 118, 210, 0.25);
-  color: #0b4aa5;
-  font-size: 12px;
-  font-weight: 700;
+  background: var(--chip);
+  color: var(--chipText);
+  border: 1px solid #dbeafe;
+  font-weight: 600;
+  font-size: 0.85rem;
 }
 
-/* -----------------------------
-   Inputs
------------------------------ */
-input,
-select,
-textarea {
-  font: inherit;
+/* =========================
+   Buttons / Inputs
+========================= */
+
+.btn {
+  background: var(--btn);
+  color: var(--btnText);
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:hover {
+  filter: brightness(0.96);
+}
+.btn.secondary {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid var(--border);
 }
 
-input,
 select,
+input,
 textarea {
   width: 100%;
-  padding: 10px 12px;
-  border-radius: 10px;
   border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 1rem;
   background: #fff;
 }
 
-label {
-  font-size: 14px;
-  color: var(--muted);
-}
+/* =========================
+   Top Bar (Mobile-first)
+========================= */
 
-/* -----------------------------
-   Album list (THIS FIXES THUMBNAILS)
------------------------------ */
-.sectionTitle {
-  margin: 18px 0 10px 0;
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.filtersRow {
+.topbar {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.brand .sub {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.nav {
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
-  align-items: flex-end;
-  margin-bottom: 12px;
 }
 
-.filterBlock {
-  min-width: 160px;
+.nav button {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+}
+.nav button.active {
+  background: #e8f1ff;
+  border-color: #b7d5ff;
 }
 
-/* Each album "neat box" row */
-.albumRow {
+.authRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.authRow .pill {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Desktop/tablet enhancements */
+@media (min-width: 760px) {
+  .topbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .brand {
+    flex: 0 0 auto;
+  }
+  .nav {
+    justify-content: center;
+    flex: 1 1 auto;
+  }
+  .authRow {
+    flex: 0 0 auto;
+    justify-content: flex-end;
+  }
+}
+
+/* =========================
+   Album List - Controls
+========================= */
+
+.controlsRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.controlItem label {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+@media (min-width: 760px) {
+  .controlsRow {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}
+
+/* =========================
+   Album Cards (NEAT BOXES + THUMBNAILS)
+========================= */
+
+.albumCard {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 12px;
+  margin-bottom: 12px;
+}
+
+/* Header row is a stable 3-column layout:
+   [thumb] [title/meta] [expand button] */
+.albumRow {
   display: grid;
-  grid-template-columns: 72px 1fr auto;
+  grid-template-columns: 56px 1fr auto;
   gap: 12px;
   align-items: center;
-  margin-bottom: 10px;
 }
 
-/* Force historic cover to thumbnail size */
 .albumThumb {
-  width: 72px;
-  height: 72px;
-  border-radius: 12px;
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.albumThumb img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  flex: 0 0 auto;
-  background: #eee;
+  display: block;
 }
 
-/* Text block */
-.albumMeta {
-  min-width: 0;
+.albumTitle {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
-.albumTitleLine {
+.albumSub {
+  margin: 4px 0 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.albumMetaLine {
+  margin-top: 6px;
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
-  align-items: baseline;
+  color: #111827;
+  font-size: 0.92rem;
 }
-
-.albumTitleLine strong {
-  font-size: 15px;
-}
-
-.albumTitleLine span {
+.albumMetaLine .muted {
   color: var(--muted);
-  font-size: 13px;
-}
-
-.albumSubLine {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.albumActions {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .expandBtn {
-  appearance: none;
-  border: 1px solid var(--border);
   background: #fff;
-  color: var(--blue);
-  padding: 8px 12px;
+  border: 1px solid var(--border);
   border-radius: 999px;
+  padding: 8px 12px;
   cursor: pointer;
   font-weight: 700;
-  box-shadow: var(--shadow);
+  color: #0f172a;
+}
+.expandBtn:hover {
+  background: #f9fafb;
 }
 
-/* Expanded panel */
+/* Expanded section */
 .albumExpanded {
-  grid-column: 1 / -1;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px dashed var(--border);
+  border-top: 1px solid var(--border);
 }
 
-/* -----------------------------
-   iPhone fixes (stack topbar + align expand)
------------------------------ */
-@media (max-width: 560px) {
-  .topbar {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
+.albumExpandedGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
 
-  .nav {
-    justify-content: flex-start;
+@media (min-width: 760px) {
+  .albumExpandedGrid {
+    grid-template-columns: 160px 1fr;
   }
+}
 
-  .authRow {
-    justify-content: flex-start;
-  }
+.albumHero {
+  width: 100%;
+  max-width: 220px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #f3f4f6;
+}
 
-  .pill {
-    max-width: 100%;
-  }
+.albumHero img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
 
-  /* Make album row wrap cleanly on iPhone */
+.ratingRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.feedbackOk {
+  color: #15803d;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.trackList {
+  margin: 10px 0 0 0;
+  padding-left: 18px;
+}
+
+.ratingItem {
+  font-size: 0.92rem;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.ratingItem em {
+  color: var(--muted);
+}
+
+/* Extra small phones */
+@media (max-width: 390px) {
   .albumRow {
-    grid-template-columns: 64px 1fr;
-    grid-template-areas:
-      "thumb meta"
-      "actions actions"
-      "expanded expanded";
-    align-items: start;
+    grid-template-columns: 52px 1fr auto;
   }
-
   .albumThumb {
-    width: 64px;
-    height: 64px;
-    border-radius: 12px;
+    width: 52px;
+    height: 52px;
   }
-
-  .albumActions {
-    grid-column: 1 / -1;
-    justify-content: flex-end;
-    margin-top: 6px;
+  .nav button {
+    padding: 8px 10px;
+    font-size: 0.92rem;
   }
 }
