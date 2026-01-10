@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
-import { addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
 
 function formatLondonDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -16,131 +16,107 @@ function formatLondonDateKey(date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
-async function fetchAlbumInfoFromLastFM(artist, album) {
+async function fetchCoverUrl(artist, album) {
   const apiKey = "b6ad7c38684dcfba8acbb9b4bb345e86";
   const url = `https://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=${apiKey}&artist=${encodeURIComponent(
     artist
   )}&album=${encodeURIComponent(album)}&format=json`;
 
   try {
-    const res = await fetch(url);
-    const data = await res.json();
-
+    const response = await fetch(url);
+    const data = await response.json();
     const image = data?.album?.image?.find((img) => img.size === "extralarge");
-    const coverUrl = image?.["#text"] || "";
-
-    const rawTracks = data?.album?.tracks?.track;
-    const arr = Array.isArray(rawTracks) ? rawTracks : rawTracks ? [rawTracks] : [];
-    const tracks = arr
-      .map((t) => (typeof t?.name === "string" ? t.name.trim() : ""))
-      .filter(Boolean);
-
-    return { coverUrl, tracks };
-  } catch (e) {
-    console.error("Last.fm album.getinfo failed:", e?.message || e);
-    return { coverUrl: "", tracks: [] };
+    return image?.["#text"] || "";
+  } catch (error) {
+    console.error("Failed to fetch album art", error);
+    return "";
   }
 }
 
 export default function NominateAlbum() {
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
-
+  const [isTodayNominator, setIsTodayNominator] = useState(null); // null = loading
   const [loading, setLoading] = useState(true);
-  const [canNominate, setCanNominate] = useState(false);
-  const [blockedReason, setBlockedReason] = useState("");
-
-  const todayKey = useMemo(() => formatLondonDateKey(), []);
-  const currentUser = auth.currentUser;
 
   useEffect(() => {
-    const checkPermission = async () => {
-      setLoading(true);
-      setBlockedReason("");
+    const checkNominator = async () => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
 
-      try {
-        const ref = doc(db, "nominationsSchedule", todayKey);
-        const snap = await getDoc(ref);
+      const todayStr = formatLondonDateKey(new Date());
+      const ref = doc(db, "nominationsSchedule", todayStr);
+      const snap = await getDoc(ref);
 
-        if (!snap.exists()) {
-          setCanNominate(false);
-          setBlockedReason("No schedule found for today.");
-          return;
-        }
-
-        const data = snap.data();
-        const isNewMusicFriday =
-          data?.userEmail === "New Music Friday 🎧" || data?.type === "new_music_friday";
-
-        if (isNewMusicFriday) {
-          setCanNominate(false);
-          setBlockedReason("Today is New Music Friday — nominations are paused.");
-          return;
-        }
-
-        if (!currentUser) {
-          setCanNominate(false);
-          setBlockedReason("You are not logged in.");
-          return;
-        }
-
-        const ok = currentUser.uid === data.userId;
-        setCanNominate(ok);
-        if (!ok) setBlockedReason("You are not today's nominator.");
-      } catch (e) {
-        console.error("Failed to check nominator:", e?.message || e);
-        setCanNominate(false);
-        setBlockedReason("Failed to verify nominator status.");
-      } finally {
+      if (!snap.exists()) {
+        setIsTodayNominator(false);
         setLoading(false);
+        return;
       }
+
+      const data = snap.data();
+
+      // Support both userId and userID (case mismatch happens a lot)
+      const scheduledUid = data.userId || data.userID || "";
+      setIsTodayNominator(currentUser.uid === scheduledUid);
+
+      setLoading(false);
     };
 
-    checkPermission();
-  }, [todayKey, currentUser]);
+    // Re-check when auth state changes
+    const unsub = auth.onAuthStateChanged(() => checkNominator());
+    return () => unsub();
+  }, []);
 
-  const submit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!currentUser) return;
 
-    const cleanTitle = title.trim();
-    const cleanArtist = artist.trim();
-    if (!cleanTitle || !cleanArtist) {
-      alert("Please enter album title and artist.");
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      alert("Please log in first.");
+      return;
+    }
+
+    if (!title.trim() || !artist.trim()) {
+      alert("Please enter album and artist");
       return;
     }
 
     try {
-      const { coverUrl, tracks } = await fetchAlbumInfoFromLastFM(cleanArtist, cleanTitle);
+      const coverUrl = await fetchCoverUrl(artist.trim(), title.trim());
 
       await addDoc(collection(db, "albums"), {
-        title: cleanTitle,
-        artist: cleanArtist,
+        title: title.trim(),
+        artist: artist.trim(),
         coverUrl,
-        tracks, // ✅ store once at nomination time
-        nominatedBy: currentUser.email || "Unknown",
+        nominatedBy: currentUser.email,
         nominationDate: serverTimestamp(),
       });
 
       setTitle("");
       setArtist("");
       alert("Album submitted!");
-    } catch (e2) {
-      console.error("Album submission failed:", e2?.message || e2);
+    } catch (error) {
+      console.error("Submission error:", error?.message || error);
       alert("Failed to submit album.");
     }
   };
 
   if (loading) {
-    return <div className="card">Loading nomination form…</div>;
-  }
-
-  if (!canNominate) {
     return (
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>🎵 Nominate an Album</h3>
-        <p className="smallNote" style={{ marginTop: 6 }}>
-          {blockedReason || "You cannot nominate today."}
+        <h2 style={{ marginTop: 0 }}>🎵 Nominate an Album</h2>
+        <p className="smallNote">Loading nomination form…</p>
+      </div>
+    );
+  }
+
+  if (!isTodayNominator) {
+    return (
+      <div className="card">
+        <h2 style={{ marginTop: 0 }}>🎵 Nominate an Album</h2>
+        <p className="smallNote" style={{ marginTop: 8 }}>
+          You are not today’s nominator.
         </p>
       </div>
     );
@@ -148,25 +124,41 @@ export default function NominateAlbum() {
 
   return (
     <div className="card">
-      <h3 style={{ marginTop: 0 }}>🎵 Nominate an Album</h3>
+      <h2 style={{ marginTop: 0 }}>🎵 Nominate an Album</h2>
 
-      <form onSubmit={submit}>
-        <div style={{ display: "grid", gap: 10 }}>
-          <label>
-            <div className="smallNote">Album Title</div>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} required />
-          </label>
+      <form onSubmit={handleSubmit} className="formGrid">
+        <div className="formRow">
+          <div className="label">Album Title</div>
+          <input
+            className="input"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g., OK Computer"
+            required
+          />
+        </div>
 
-          <label>
-            <div className="smallNote">Artist</div>
-            <input value={artist} onChange={(e) => setArtist(e.target.value)} required />
-          </label>
+        <div className="formRow">
+          <div className="label">Artist</div>
+          <input
+            className="input"
+            value={artist}
+            onChange={(e) => setArtist(e.target.value)}
+            placeholder="e.g., Radiohead"
+            required
+          />
+        </div>
 
-          <button className="btn" type="submit" style={{ width: "fit-content" }}>
+        <div className="formActions">
+          <button type="submit" className="btn">
             Submit Nomination
           </button>
         </div>
       </form>
+
+      <div className="smallNote" style={{ marginTop: 10 }}>
+        Tip: On iPhone/iPad, the inputs use a larger font to avoid Safari zooming.
+      </div>
     </div>
   );
 }
