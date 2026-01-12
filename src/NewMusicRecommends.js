@@ -77,7 +77,7 @@ export default function NewMusicRecommends() {
     <div className="card">
       <h2 style={{ marginTop: 0 }}>📝 New Music Recommends</h2>
       <p className="smallNote" style={{ marginTop: 6 }}>
-        Leave a quick note about a new release album or trackyou recommend.
+        Leave a quick note about a new release album or track you recommend.
       </p>
 
       <form onSubmit={handleAdd} style={{ marginTop: 12 }}>
