@@ -156,9 +156,12 @@ export default function NominateAlbum() {
         </div>
       </form>
 
-    
+      <div className="smallNote" style={{ marginTop: 10 }}>
+        
+      </div>
     </div>
   );
 }
+
 
 
