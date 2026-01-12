@@ -4,13 +4,12 @@ import {
   collection,
   doc,
   onSnapshot,
-  orderBy,
   query,
-  serverTimestamp,
+  orderBy,
   setDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 
-/** -------- London date helpers -------- */
 function formatLondonDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/London",
@@ -22,13 +21,38 @@ function formatLondonDateKey(date = new Date()) {
   const y = parts.find((p) => p.type === "year")?.value;
   const m = parts.find((p) => p.type === "month")?.value;
   const d = parts.find((p) => p.type === "day")?.value;
-
   return `${y}-${m}-${d}`;
 }
 
-function toLondonDateKeyFromTimestamp(ts) {
+function toDateKeyFromTimestamp(ts) {
   if (!ts?.toDate) return "";
   return formatLondonDateKey(ts.toDate());
+}
+
+async function fetchTracksFromLastFM(artist, album) {
+  const apiKey = "b6ad7c38684dcfba8acbb9b4bb345e86";
+  const url = `https://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=${apiKey}&artist=${encodeURIComponent(
+    artist
+  )}&album=${encodeURIComponent(album)}&format=json`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    const rawTracks = data?.album?.tracks?.track;
+    const arr = Array.isArray(rawTracks)
+      ? rawTracks
+      : rawTracks
+      ? [rawTracks]
+      : [];
+
+    return arr
+      .map((t) => (typeof t?.name === "string" ? t.name.trim() : ""))
+      .filter(Boolean);
+  } catch (e) {
+    console.error("Failed to fetch tracks from Last.fm:", e?.message || e);
+    return [];
+  }
 }
 
 export default function AlbumListNew() {
@@ -44,168 +68,150 @@ export default function AlbumListNew() {
   const [selectedNominator, setSelectedNominator] = useState("All");
   const [sortOrder, setSortOrder] = useState("newest"); // newest | rating
 
-  // expanded state: albumId -> boolean
   const [expanded, setExpanded] = useState({});
+  const [tracksByAlbum, setTracksByAlbum] = useState({}); // albumId -> string[]
 
   const todayKey = useMemo(() => formatLondonDateKey(), []);
-  const user = auth.currentUser;
 
-  /** -------- Load albums -------- */
+  // Albums
   useEffect(() => {
-    const qAlbums = query(collection(db, "albums"), orderBy("nominationDate", "desc"));
+    const qAlbums = query(
+      collection(db, "albums"),
+      orderBy("nominationDate", "desc")
+    );
 
     const unsub = onSnapshot(qAlbums, (snapshot) => {
       const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-      // Unique nominators list (for filter)
-      const uniqueNoms = Array.from(new Set(data.map((a) => a.nominatedBy))).filter(Boolean);
-      setNominators(uniqueNoms);
+      const uniqueNominators = Array.from(
+        new Set(data.map((a) => a.nominatedBy))
+      ).filter(Boolean);
 
       setAlbums(data);
-
-      // Force: today's album expanded, everything else collapsed by default
-      const todaysAlbum = data.find((a) => toLondonDateKeyFromTimestamp(a.nominationDate) === todayKey);
-
-      setExpanded((prev) => {
-        const next = { ...prev };
-
-        // Default everything in the list to collapsed unless already explicitly set
-        for (const a of data) {
-          if (next[a.id] === undefined) next[a.id] = false;
-        }
-
-        // Force today's expanded
-        if (todaysAlbum?.id) next[todaysAlbum.id] = true;
-
-        // Optional cleanup: remove keys that no longer exist
-        const validIds = new Set(data.map((a) => a.id));
-        Object.keys(next).forEach((k) => {
-          if (!validIds.has(k)) delete next[k];
-        });
-
-        return next;
-      });
+      setNominators(uniqueNominators);
     });
 
     return () => unsub();
-  }, [todayKey]);
+  }, []);
 
-  /** -------- Load ratings & compute averages -------- */
+  // Ratings
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "ratings"), (snapshot) => {
       const map = {};
       const all = [];
 
       snapshot.forEach((d) => {
-        const data = d.data();
-        all.push({ id: d.id, ...data });
+        const r = d.data();
+        all.push({ id: d.id, ...r });
 
-        const { albumId, score } = data || {};
-        if (!albumId) return;
+        const { albumId, score } = r;
         if (!map[albumId]) map[albumId] = [];
-        map[albumId].push(Number(score || 0));
+        map[albumId].push(Number(score));
       });
 
       const avg = {};
       Object.keys(map).forEach((albumId) => {
         const scores = map[albumId];
-        const average = scores.reduce((s, v) => s + v, 0) / Math.max(scores.length, 1);
+        const average = scores.reduce((s, v) => s + v, 0) / scores.length;
         avg[albumId] = average.toFixed(1);
       });
 
-      setRatingsByAlbum(avg);
       setAllRatings(all);
+      setRatingsByAlbum(avg);
     });
 
     return () => unsub();
   }, []);
 
-  /** -------- Rating submit -------- */
-  const handleRate = async (albumId, value) => {
-    const u = auth.currentUser;
-    if (!u) return;
+  async function handleRate(albumId, value) {
+    const user = auth.currentUser;
+    if (!user) return;
 
-    const score = Number(value);
-    const comment = prompt("Optional: Leave a short comment about this album") || "";
+    const userId = user.uid;
+    const userEmail = user.email;
+    const comment =
+      prompt("Optional: Leave a short comment about this album") || "";
 
-    setRatingsDraft((prev) => ({ ...prev, [albumId]: score }));
+    setRatingsDraft((prev) => ({ ...prev, [albumId]: value }));
 
     try {
-      const ratingId = `${u.uid}_${albumId}`;
+      const ratingId = `${userId}_${albumId}`;
       const ref = doc(db, "ratings", ratingId);
 
       await setDoc(ref, {
         albumId,
-        userId: u.uid,
-        userEmail: u.email,
-        score,
+        userId,
+        userEmail,
+        score: Number(value),
         comment,
         timestamp: serverTimestamp(),
       });
 
       setFeedback((prev) => ({ ...prev, [albumId]: "Rating saved ✓" }));
-      setTimeout(() => setFeedback((prev) => ({ ...prev, [albumId]: "" })), 2000);
+      setTimeout(() => {
+        setFeedback((prev) => ({ ...prev, [albumId]: "" }));
+      }, 2000);
     } catch (e) {
       console.error("Rating error:", e?.message || e);
-      setFeedback((prev) => ({ ...prev, [albumId]: "Failed to save rating" }));
-      setTimeout(() => setFeedback((prev) => ({ ...prev, [albumId]: "" })), 2500);
     }
-  };
+  }
 
-  /** -------- Filters + sorting -------- */
-  const filteredAndSorted = useMemo(() => {
-    const list = albums
-      .filter((a) => {
-        const avg = ratingsByAlbum[a.id];
-        return avg === undefined || Number(avg) >= minRating;
-      })
-      .filter((a) => (selectedNominator === "All" ? true : a.nominatedBy === selectedNominator))
-      .sort((a, b) => {
-        if (sortOrder === "rating") {
-          const aAvg = parseFloat(ratingsByAlbum[a.id] || 0);
-          const bAvg = parseFloat(ratingsByAlbum[b.id] || 0);
-          return bAvg - aAvg;
-        }
-        // newest
-        const da = a.nominationDate?.toDate?.() || new Date(0);
-        const dbb = b.nominationDate?.toDate?.() || new Date(0);
-        return dbb - da;
-      });
+  async function toggleExpand(album) {
+    const next = !expanded[album.id];
+    setExpanded((prev) => ({ ...prev, [album.id]: next }));
 
-    return list;
-  }, [albums, ratingsByAlbum, minRating, selectedNominator, sortOrder]);
+    // Lazy-load tracks on first expand
+    if (next && !tracksByAlbum[album.id]) {
+      const tracks = await fetchTracksFromLastFM(album.artist, album.title);
+      setTracksByAlbum((prev) => ({ ...prev, [album.id]: tracks }));
+    }
+  }
 
-  /** -------- Identify today album id for rendering rules -------- */
-  const todaysAlbumId = useMemo(() => {
-    const t = albums.find((a) => toLondonDateKeyFromTimestamp(a.nominationDate) === todayKey);
-    return t?.id || null;
-  }, [albums, todayKey]);
-
-  const toggleExpand = (albumId) => {
-    // Do not allow collapsing today's album
-    if (albumId === todaysAlbumId) return;
-    setExpanded((prev) => ({ ...prev, [albumId]: !prev[albumId] }));
-  };
+  const filteredAndSorted = albums
+    .filter((a) => {
+      const avg = ratingsByAlbum[a.id];
+      return avg === undefined || Number(avg) >= minRating;
+    })
+    .filter((a) =>
+      selectedNominator === "All" ? true : a.nominatedBy === selectedNominator
+    )
+    .sort((a, b) => {
+      if (sortOrder === "rating") {
+        const avgA = parseFloat(ratingsByAlbum[a.id] || "0");
+        const avgB = parseFloat(ratingsByAlbum[b.id] || "0");
+        return avgB - avgA;
+      }
+      // newest first
+      const da = a.nominationDate?.toDate?.() || new Date(0);
+      const dbb = b.nominationDate?.toDate?.() || new Date(0);
+      return dbb - da;
+    });
 
   return (
     <div style={{ marginTop: "1rem" }}>
-      <h2 style={{ margin: "0 0 10px 0" }}>🎧 Album Nominations</h2>
+      <h2 style={{ marginBottom: 8 }}>Historic Nominations</h2>
 
-      <div className="filtersRow">
-        <label className="filter">
-          Min Avg Rating
-          <select value={minRating} onChange={(e) => setMinRating(Number(e.target.value))}>
+      <div className="controlsRow">
+        <div className="controlItem">
+          <label>Min Avg Rating</label>
+          <select
+            value={minRating}
+            onChange={(e) => setMinRating(Number(e.target.value))}
+          >
             {[0, 5, 6, 7, 8, 9].map((r) => (
               <option key={r} value={r}>
                 {r}+
               </option>
             ))}
           </select>
-        </label>
+        </div>
 
-        <label className="filter">
-          Nominator
-          <select value={selectedNominator} onChange={(e) => setSelectedNominator(e.target.value)}>
+        <div className="controlItem">
+          <label>Nominator</label>
+          <select
+            value={selectedNominator}
+            onChange={(e) => setSelectedNominator(e.target.value)}
+          >
             <option value="All">All</option>
             {nominators.map((n) => (
               <option key={n} value={n}>
@@ -213,107 +219,169 @@ export default function AlbumListNew() {
               </option>
             ))}
           </select>
-        </label>
+        </div>
 
-        <label className="filter">
-          Sort
-          <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+        <div className="controlItem">
+          <label>Sort</label>
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+          >
             <option value="newest">Newest First</option>
             <option value="rating">Highest Rated</option>
           </select>
-        </label>
+        </div>
       </div>
 
       {filteredAndSorted.length === 0 ? (
-        <p>No albums match this filter.</p>
+        <p className="smallNote" style={{ marginTop: 12 }}>
+          No albums match this filter.
+        </p>
       ) : (
-        filteredAndSorted.map((album) => {
-          const avg = ratingsByAlbum[album.id];
-          const isToday = album.id === todaysAlbumId;
-          const isExpanded = !!expanded[album.id]; // todays album will be forced true
-          const cover = album.coverUrl;
+        <div style={{ marginTop: 12 }}>
+          {filteredAndSorted.map((album) => {
+            const avg = ratingsByAlbum[album.id];
+            const dateKey = toDateKeyFromTimestamp(album.nominationDate);
+            const isTodayAlbum = dateKey && dateKey === todayKey;
 
-          return (
-            <div key={album.id} className={`albumCard ${isToday ? "todayCard" : ""}`}>
-              <div className="albumRow">
-                <div className="albumThumbWrap">
-                  {cover ? (
-                    <img
-                      src={cover}
-                      alt={`${album.title} cover`}
-                      className={isToday ? "albumCoverToday" : "albumCoverThumb"}
-                    />
-                  ) : (
-                    <div className={isToday ? "albumCoverToday placeholder" : "albumCoverThumb placeholder"}>
-                      No Image
-                    </div>
-                  )}
+            return (
+              <div className="albumCard" key={album.id}>
+                {/* COLLAPSED HEADER ROW (ALWAYS THUMBNAIL) */}
+                <div className="albumRow">
+                  <div className="albumThumb">
+                    {album.coverUrl ? (
+                      <img src={album.coverUrl} alt={`${album.title} cover`} />
+                    ) : (
+                      <span style={{ fontSize: 12, color: "#6b7280" }}>
+                        No image
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="albumTitle">
+                      {album.title}{" "}
+                      <span style={{ fontWeight: 500, color: "#6b7280" }}>
+                        — {album.artist}
+                      </span>
+                    </p>
+
+                    <p className="albumSub">
+                      Nominated by <strong>{album.nominatedBy || "Unknown"}</strong>
+                      {avg ? (
+                        <>
+                          {" "}
+                          · <span className="muted">Avg:</span>{" "}
+                          <strong>{avg}/10</strong>
+                        </>
+                      ) : (
+                        <>
+                          {" "}
+                          · <span className="muted">No ratings yet</span>
+                        </>
+                      )}
+                      {isTodayAlbum ? (
+                        <span className="badgeFriday" style={{ marginLeft: 10 }}>
+                          Today’s album
+                        </span>
+                      ) : null}
+                    </p>
+                  </div>
+
+                  <button
+                    className="expandBtn"
+                    onClick={() => toggleExpand(album)}
+                  >
+                    {expanded[album.id] ? "Collapse" : "Expand"}
+                  </button>
                 </div>
 
-                <div className="albumMain">
-                  <div className="albumTitleRow">
-                    <div className="albumTitle">
-                      <strong>{album.title}</strong>
-                      <span className="albumArtist"> — {album.artist}</span>
-                    </div>
+                {/* EXPANDED DETAILS */}
+                {expanded[album.id] ? (
+                  <div className="albumExpanded">
+                    <div className="albumExpandedGrid">
+                      <div className="albumHero">
+                        {album.coverUrl ? (
+                          <img
+                            src={album.coverUrl}
+                            alt={`${album.title} cover large`}
+                          />
+                        ) : null}
+                      </div>
 
-                    <button
-                      className={`btn tiny ${isToday ? "disabled" : ""}`}
-                      onClick={() => toggleExpand(album.id)}
-                      title={isToday ? "Today's album is always expanded" : "Expand/collapse"}
-                    >
-                      {isToday ? "Today" : isExpanded ? "Collapse" : "Expand"}
-                    </button>
-                  </div>
+                      <div>
+                        <div className="ratingRow">
+                          <div>
+                            <strong>Your rating</strong>
+                          </div>
 
-                  <div className="albumMeta">
-                    <span>
-                      Nominated by <strong>{album.nominatedBy || "Unknown"}</strong>
-                    </span>
-                    <span className="dot">•</span>
-                    <span>
-                      Avg: <strong>{avg ? `${avg}/10` : "—"}</strong>
-                    </span>
-                  </div>
-
-                  {isExpanded ? (
-                    <div className="albumExpanded">
-                      <div className="rateRow">
-                        <label>
-                          Your rating{" "}
                           <select
                             value={ratingsDraft[album.id] || ""}
                             onChange={(e) => handleRate(album.id, e.target.value)}
+                            style={{ maxWidth: 180 }}
                           >
                             <option value="">--</option>
-                            {Array.from({ length: 10 }).map((_, i) => (
+                            {[...Array(10)].map((_, i) => (
                               <option key={i + 1} value={i + 1}>
                                 {i + 1}
                               </option>
                             ))}
                           </select>
-                        </label>
+                        </div>
 
-                        {feedback[album.id] ? <span className="saveMsg">{feedback[album.id]}</span> : null}
-                      </div>
+                        {feedback[album.id] ? (
+                          <div className="feedbackOk">{feedback[album.id]}</div>
+                        ) : null}
 
-                      <div className="ratingsList">
-                        {allRatings
-                          .filter((r) => r.albumId === album.id)
-                          .map((r) => (
-                            <div key={`${r.userId}_${r.albumId}`} className="ratingLine">
-                              <strong>{r.username || r.userEmail}</strong> rated <strong>{r.score}/10</strong>
-                              {r.comment ? <span className="comment">“{r.comment}”</span> : null}
-                            </div>
-                          ))}
+                        <div style={{ marginTop: 10 }}>
+                          <strong>Track listing</strong>
+                          {tracksByAlbum[album.id] ? (
+                            tracksByAlbum[album.id].length ? (
+                              <ol className="trackList">
+                                {tracksByAlbum[album.id].map((t, idx) => (
+                                  <li key={idx}>{t}</li>
+                                ))}
+                              </ol>
+                            ) : (
+                              <p className="smallNote" style={{ marginTop: 6 }}>
+                                No tracks found for this album (Last.fm can be patchy on
+                                some entries).
+                              </p>
+                            )
+                          ) : (
+                            <p className="smallNote" style={{ marginTop: 6 }}>
+                              Loading tracks…
+                            </p>
+                          )}
+                        </div>
+
+                        <div style={{ marginTop: 12 }}>
+                          <strong>Ratings</strong>
+                          <div style={{ marginTop: 8 }}>
+                            {allRatings
+                              .filter((r) => r.albumId === album.id)
+                              .map((r) => (
+                                <div className="ratingItem" key={r.id}>
+                                  <strong>{r.username || r.userEmail}</strong>{" "}
+                                  rated <strong>{r.score}/10</strong>
+                                  {r.comment ? (
+                                    <>
+                                      {" "}
+                                      <em>“{r.comment}”</em>
+                                    </>
+                                  ) : null}
+                                </div>
+                              ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
               </div>
-            </div>
-          );
-        })
+            );
+          })}
+        </div>
       )}
     </div>
   );
