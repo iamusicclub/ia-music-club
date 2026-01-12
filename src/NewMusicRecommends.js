@@ -77,8 +77,7 @@ export default function NewMusicRecommends() {
     <div className="card">
       <h2 style={{ marginTop: 0 }}>📝 New Music Recommends</h2>
       <p className="smallNote" style={{ marginTop: 6 }}>
-        Leave a quick note about an album you recommend. No ratings here — just a
-        shared scrapbook.
+        Leave a quick note about a new release album or trackyou recommend.
       </p>
 
       <form onSubmit={handleAdd} style={{ marginTop: 12 }}>
@@ -90,7 +89,6 @@ export default function NewMusicRecommends() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={3}
-          placeholder="e.g. New album: Floating Points — Cascade. Stunning production, great late-night listen."
           style={{ width: "100%", resize: "vertical" }}
         />
 
