@@ -157,11 +157,15 @@ export default function NominateAlbum() {
       </form>
 
       <div className="smallNote" style={{ marginTop: 10 }}>
-        
+          <div className="smallNote" style={{ marginTop: 10 }}>
+
+        Tip: Album/Artist must match Spotify exactly for album art/track lists to appear
+      </div>
       </div>
     </div>
   );
 }
+
 
 
 
