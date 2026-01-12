@@ -156,10 +156,9 @@ export default function NominateAlbum() {
         </div>
       </form>
 
-      <div className="smallNote" style={{ marginTop: 10 }}>
-        Tip: On iPhone/iPad, the inputs use a larger font to avoid Safari zooming.
-      </div>
+    
     </div>
   );
 }
+
 
