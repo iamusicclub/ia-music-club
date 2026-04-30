@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc,
+  getDocs,
+} from "firebase/firestore";
 import { auth, db } from "./firebase";
 
 function formatLondonDateKey(date = new Date()) {
@@ -14,6 +21,51 @@ function formatLondonDateKey(date = new Date()) {
   const m = parts.find((p) => p.type === "month")?.value;
   const d = parts.find((p) => p.type === "day")?.value;
   return `${y}-${m}-${d}`;
+}
+
+function normalizeText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/^the\s+/i, "")
+    .replace(/&/g, "and")
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function findDuplicateAlbum(inputTitle, inputArtist) {
+  const normalizedInputTitle = normalizeText(inputTitle);
+  const normalizedInputArtist = normalizeText(inputArtist);
+
+  const snapshot = await getDocs(collection(db, "albums"));
+
+  let duplicate = null;
+
+  snapshot.forEach((docSnap) => {
+    if (duplicate) return;
+
+    const data = docSnap.data();
+
+    const existingTitle = data.title || data.album || "";
+    const existingArtist = data.artist || "";
+
+    const normalizedExistingTitle = normalizeText(existingTitle);
+    const normalizedExistingArtist = normalizeText(existingArtist);
+
+    if (
+      normalizedInputTitle === normalizedExistingTitle &&
+      normalizedInputArtist === normalizedExistingArtist
+    ) {
+      duplicate = {
+        id: docSnap.id,
+        title: existingTitle,
+        artist: existingArtist,
+        source: data.source || "website",
+      };
+    }
+  });
+
+  return duplicate;
 }
 
 async function fetchCoverUrl(artist, album) {
@@ -36,13 +88,18 @@ async function fetchCoverUrl(artist, album) {
 export default function NominateAlbum() {
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
-  const [isTodayNominator, setIsTodayNominator] = useState(null); // null = loading
+  const [isTodayNominator, setIsTodayNominator] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const checkNominator = async () => {
       const currentUser = auth.currentUser;
-      if (!currentUser) return;
+      if (!currentUser) {
+        setIsTodayNominator(false);
+        setLoading(false);
+        return;
+      }
 
       const todayStr = formatLondonDateKey(new Date());
       const ref = doc(db, "nominationsSchedule", todayStr);
@@ -55,15 +112,12 @@ export default function NominateAlbum() {
       }
 
       const data = snap.data();
-
-      // Support both userId and userID (case mismatch happens a lot)
       const scheduledUid = data.userId || data.userID || "";
-      setIsTodayNominator(currentUser.uid === scheduledUid);
 
+      setIsTodayNominator(currentUser.uid === scheduledUid);
       setLoading(false);
     };
 
-    // Re-check when auth state changes
     const unsub = auth.onAuthStateChanged(() => checkNominator());
     return () => unsub();
   }, []);
@@ -77,20 +131,45 @@ export default function NominateAlbum() {
       return;
     }
 
-    if (!title.trim() || !artist.trim()) {
-      alert("Please enter album and artist");
+    const cleanTitle = title.trim();
+    const cleanArtist = artist.trim();
+
+    if (!cleanTitle || !cleanArtist) {
+      alert("Please enter album and artist.");
       return;
     }
 
+    setSubmitting(true);
+
     try {
-      const coverUrl = await fetchCoverUrl(artist.trim(), title.trim());
+      const duplicate = await findDuplicateAlbum(cleanTitle, cleanArtist);
+
+      if (duplicate) {
+        const sourceText =
+          duplicate.source === "1001_albums"
+            ? "the 1001 Albums archive"
+            : "the website nominations";
+
+        alert(
+          `This album already exists in ${sourceText}:\n\n${duplicate.title} — ${duplicate.artist}`
+        );
+
+        setSubmitting(false);
+        return;
+      }
+
+      const coverUrl = await fetchCoverUrl(cleanArtist, cleanTitle);
 
       await addDoc(collection(db, "albums"), {
-        title: title.trim(),
-        artist: artist.trim(),
+        title: cleanTitle,
+        artist: cleanArtist,
+        normalizedTitle: normalizeText(cleanTitle),
+        normalizedArtist: normalizeText(cleanArtist),
         coverUrl,
         nominatedBy: currentUser.email,
+        nominatedByUid: currentUser.uid,
         nominationDate: serverTimestamp(),
+        source: "website",
       });
 
       setTitle("");
@@ -99,6 +178,8 @@ export default function NominateAlbum() {
     } catch (error) {
       console.error("Submission error:", error?.message || error);
       alert("Failed to submit album.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -135,6 +216,7 @@ export default function NominateAlbum() {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g., OK Computer"
             required
+            disabled={submitting}
           />
         </div>
 
@@ -146,26 +228,21 @@ export default function NominateAlbum() {
             onChange={(e) => setArtist(e.target.value)}
             placeholder="e.g., Radiohead"
             required
+            disabled={submitting}
           />
         </div>
 
         <div className="formActions">
-          <button type="submit" className="btn">
-            Submit Nomination
+          <button type="submit" className="btn" disabled={submitting}>
+            {submitting ? "Checking archive…" : "Submit Nomination"}
           </button>
         </div>
       </form>
 
       <div className="smallNote" style={{ marginTop: 10 }}>
-          <div className="smallNote" style={{ marginTop: 10 }}>
-
-        Tip: Album/Artist must match Spotify exactly for album art/track lists to appear
-      </div>
+        Tip: The app now checks existing website nominations and the 1001 Albums
+        archive before submitting.
       </div>
     </div>
   );
 }
-
-
-
-
