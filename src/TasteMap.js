@@ -133,9 +133,7 @@ export default function TasteMap() {
       <div className="card">
         <h2 style={{ marginTop: 0 }}>🎨 Taste Map</h2>
         <p className="smallNote" style={{ marginBottom: 0 }}>
-          Average rating given by each person to each nominator. Website email
-          accounts and 1001 archive names are merged into the same four
-          participant names.
+          Average rating given by each person to each nominator. 
         </p>
       </div>
 
@@ -214,9 +212,7 @@ export default function TasteMap() {
         </table>
 
         <p className="smallNote" style={{ marginTop: 12, marginBottom: 0 }}>
-          Note: the rater/nominator heatmap only includes albums nominated by a
-          named club member. 1001 archive scores are normalised and can be used
-          in future taste-analysis views, but they do not have a club nominator.
+          
         </p>
       </div>
     </div>
