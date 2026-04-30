@@ -4,7 +4,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 
 const PARTICIPANTS = {
   Scott: ["Scott", "scottcee01@gmail.com", "scottcee01@googlemail.com"],
-  Matt: ["Matt", "matthodges@outlook.com"],
+  Matt: ["Matt", "mattdhodges@outlook.com"],
   Dave: ["Dave", "davews1621@gmail.com"],
   John: ["John", "jfield1968@gmail.com"],
 };
