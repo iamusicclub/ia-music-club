@@ -96,7 +96,7 @@ export default function App() {
     <div className="container">
       <div className="topbar">
         <div className="brand">
-          <h1>IA Music Club</h1>
+          <h1>IA Music Club Test</h1>
           <div className="sub">
             Today: <strong>{todayKey}</strong>{" "}
             {isNewMusicFriday ? (
