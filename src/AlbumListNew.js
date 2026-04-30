@@ -10,6 +10,26 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
+const PARTICIPANTS = {
+  "scottcee01@gmail.com": "Scott",
+  "matthodges@outlook.com": "Matt",
+  "davews1621@gmail.com": "Dave",
+  "jfield1968@gmail.com": "John",
+  Scott: "Scott",
+  Matt: "Matt",
+  Dave: "Dave",
+  John: "John",
+};
+
+function displayName(value) {
+  if (!value) return "Unknown";
+
+  const clean = String(value).trim();
+  const lower = clean.toLowerCase();
+
+  return PARTICIPANTS[clean] || PARTICIPANTS[lower] || clean;
+}
+
 function formatLondonDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/London",
@@ -68,21 +88,19 @@ export default function AlbumListNew() {
   const [minRating, setMinRating] = useState(0);
   const [nominators, setNominators] = useState([]);
   const [selectedNominator, setSelectedNominator] = useState("All");
-  const [sortOrder, setSortOrder] = useState("newest"); // newest | rating
+  const [sortOrder, setSortOrder] = useState("newest");
   const [showUnratedOnly, setShowUnratedOnly] = useState(false);
 
   const [expanded, setExpanded] = useState({});
-  const [tracksByAlbum, setTracksByAlbum] = useState({}); // albumId -> string[]
+  const [tracksByAlbum, setTracksByAlbum] = useState({});
 
   const todayKey = useMemo(() => formatLondonDateKey(), []);
 
-  // Auth
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((u) => setUser(u));
     return () => unsub();
   }, []);
 
-  // Albums
   useEffect(() => {
     const qAlbums = query(
       collection(db, "albums"),
@@ -103,7 +121,6 @@ export default function AlbumListNew() {
     return () => unsub();
   }, []);
 
-  // Ratings
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "ratings"), (snapshot) => {
       const map = {};
@@ -201,7 +218,6 @@ export default function AlbumListNew() {
     const next = !expanded[album.id];
     setExpanded((prev) => ({ ...prev, [album.id]: next }));
 
-    // Lazy-load tracks on first expand
     if (next && !tracksByAlbum[album.id]) {
       const tracks = await fetchTracksFromLastFM(album.artist, album.title);
       setTracksByAlbum((prev) => ({ ...prev, [album.id]: tracks }));
@@ -283,7 +299,7 @@ export default function AlbumListNew() {
             <option value="All">All</option>
             {nominators.map((n) => (
               <option key={n} value={n}>
-                {n}
+                {displayName(n)}
               </option>
             ))}
           </select>
@@ -336,7 +352,7 @@ export default function AlbumListNew() {
 
                     <p className="albumSub">
                       Nominated by{" "}
-                      <strong>{album.nominatedBy || "Unknown"}</strong>
+                      <strong>{displayName(album.nominatedBy)}</strong>
                       {avg ? (
                         <>
                           {" "}
@@ -446,7 +462,11 @@ export default function AlbumListNew() {
                               .filter((r) => r.albumId === album.id)
                               .map((r) => (
                                 <div className="ratingItem" key={r.id}>
-                                  <strong>{r.username || r.userEmail}</strong>{" "}
+                                  <strong>
+                                    {displayName(
+                                      r.username || r.userEmail || r.user
+                                    )}
+                                  </strong>{" "}
                                   rated <strong>{r.score}/10</strong>
                                   {r.comment ? (
                                     <>
