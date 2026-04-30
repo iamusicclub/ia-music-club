@@ -141,10 +141,7 @@ export default function TasteMap() {
       <div className="card">
         <h2 style={{ marginTop: 0 }}>🎨 Taste Map</h2>
         <p className="smallNote" style={{ marginBottom: 0 }}>
-          Average rating given by each person to each nominator. Website email
-          accounts and 1001 archive names are merged into the same four
-          participant names. 1001 archive scores are normalised to a 10-point
-          scale.
+          Average rating given by each person to each nominator. 
         </p>
       </div>
 
