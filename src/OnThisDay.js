@@ -92,7 +92,7 @@ export default function OnThisDay() {
           </p>
         </div>
       ) : (
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
           {sortedAlbums.map((album) => {
             const ratings = ratingsByAlbum[album.id] || [];
             const date = album.generatedDate?.toDate?.();
@@ -102,52 +102,103 @@ export default function OnThisDay() {
             const artist = album.artist || "Unknown artist";
 
             return (
-              <div className="albumCard" key={album.id}>
-                <div className="albumRow">
-                  <div>
-                    <p className="albumTitle">
-                      {albumTitle}{" "}
-                      <span style={{ fontWeight: 500, color: "#6b7280" }}>
-                        — {artist}
-                      </span>
+              <div
+                className="card"
+                key={album.id}
+                style={{
+                  padding: 16,
+                  display: "block",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    alignItems: "flex-start",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+                    <h3 style={{ margin: "0 0 4px 0", lineHeight: 1.25 }}>
+                      {albumTitle}
+                    </h3>
+
+                    <p
+                      className="smallNote"
+                      style={{
+                        margin: 0,
+                        fontSize: 15,
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {artist}
                     </p>
-
-                    <p className="albumSub">
-                      {year ? (
-                        <>
-                          <strong>{year}</strong>
-                          {" · "}
-                        </>
-                      ) : null}
-
-                      {album.source === "1001_albums" ? (
-                        <>1001 Albums archive</>
-                      ) : (
-                        <>
-                          Nominated by{" "}
-                          <strong>{album.nominatedBy || "Unknown"}</strong>
-                        </>
-                      )}
-                    </p>
-
-                    {ratings.length > 0 ? (
-                      <div className="smallNote" style={{ marginTop: 6 }}>
-                        <strong>Ratings:</strong>{" "}
-                        {ratings.map((r, idx) => (
-                          <span key={idx} style={{ marginRight: 10 }}>
-                            {r.user}: <strong>{r.value}/10</strong>
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="smallNote" style={{ marginTop: 6 }}>
-                        No ratings yet
-                      </div>
-                    )}
                   </div>
 
-                  {year ? <span className="badgeFriday">{year}</span> : null}
+                  {year ? (
+                    <span
+                      className="badgeFriday"
+                      style={{
+                        whiteSpace: "nowrap",
+                        alignSelf: "flex-start",
+                      }}
+                    >
+                      {year}
+                    </span>
+                  ) : null}
                 </div>
+
+                <div
+                  className="smallNote"
+                  style={{
+                    marginTop: 10,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {album.source === "1001_albums" ? (
+                    <span>1001 Albums archive</span>
+                  ) : (
+                    <span>
+                      Nominated by{" "}
+                      <strong>{album.nominatedBy || "Unknown"}</strong>
+                    </span>
+                  )}
+                </div>
+
+                {ratings.length > 0 ? (
+                  <div
+                    style={{
+                      marginTop: 12,
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                    }}
+                  >
+                    {ratings.map((r, idx) => (
+                      <span
+                        key={idx}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          padding: "6px 10px",
+                          borderRadius: 999,
+                          background: "#f3f4f6",
+                          border: "1px solid #e5e7eb",
+                          fontSize: 13,
+                        }}
+                      >
+                        <strong>{r.user}</strong>
+                        <span>{r.value}/10</span>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="smallNote" style={{ marginTop: 10 }}>
+                    No ratings yet
+                  </div>
+                )}
               </div>
             );
           })}
