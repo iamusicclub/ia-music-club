@@ -52,23 +52,14 @@ export default function OnThisDay() {
         if (Number.isNaN(value)) return;
 
         if (!map[r.albumId]) map[r.albumId] = [];
-        map[r.albumId].push(value);
+
+        map[r.albumId].push({
+          user: r.user || r.userName || r.ratedBy || "User",
+          value,
+        });
       });
 
-      const avg = {};
-
-      Object.keys(map).forEach((albumId) => {
-        const scores = map[albumId];
-        const average =
-          scores.reduce((sum, val) => sum + val, 0) / scores.length;
-
-        avg[albumId] = {
-          average: average.toFixed(1),
-          count: scores.length,
-        };
-      });
-
-      setRatingsByAlbum(avg);
+      setRatingsByAlbum(map);
     });
 
     return () => unsub();
@@ -103,7 +94,7 @@ export default function OnThisDay() {
       ) : (
         <div style={{ marginTop: 12 }}>
           {sortedAlbums.map((album) => {
-            const rating = ratingsByAlbum[album.id];
+            const ratings = ratingsByAlbum[album.id] || [];
             const date = album.generatedDate?.toDate?.();
             const year = date ? date.getFullYear() : "";
 
@@ -113,16 +104,6 @@ export default function OnThisDay() {
             return (
               <div className="albumCard" key={album.id}>
                 <div className="albumRow">
-                  <div className="albumThumb">
-                    {album.coverUrl ? (
-                      <img src={album.coverUrl} alt={`${albumTitle} cover`} />
-                    ) : (
-                      <span style={{ fontSize: 12, color: "#6b7280" }}>
-                        No image
-                      </span>
-                    )}
-                  </div>
-
                   <div>
                     <p className="albumTitle">
                       {albumTitle}{" "}
@@ -147,24 +128,22 @@ export default function OnThisDay() {
                           <strong>{album.nominatedBy || "Unknown"}</strong>
                         </>
                       )}
-
-                      {rating ? (
-                        <>
-                          {" · "}
-                          <span className="muted">Avg:</span>{" "}
-                          <strong>{rating.average}/10</strong>{" "}
-                          <span className="muted">
-                            ({rating.count} rating
-                            {rating.count === 1 ? "" : "s"})
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          {" · "}
-                          <span className="muted">No ratings yet</span>
-                        </>
-                      )}
                     </p>
+
+                    {ratings.length > 0 ? (
+                      <div className="smallNote" style={{ marginTop: 6 }}>
+                        <strong>Ratings:</strong>{" "}
+                        {ratings.map((r, idx) => (
+                          <span key={idx} style={{ marginRight: 10 }}>
+                            {r.user}: <strong>{r.value}/10</strong>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="smallNote" style={{ marginTop: 6 }}>
+                        No ratings yet
+                      </div>
+                    )}
                   </div>
 
                   {year ? <span className="badgeFriday">{year}</span> : null}
