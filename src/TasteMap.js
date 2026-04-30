@@ -2,7 +2,28 @@ import { useEffect, useState } from "react";
 import { db } from "./firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 
-const USERS = ["Scott", "Matt", "Dave", "John"];
+const PARTICIPANTS = {
+  Scott: ["Scott", "scottcee01@gmail.com"],
+  Matt: ["Matt", "matthodges@outlook.com"],
+  Dave: ["Dave", "davews1621@gmail.com"],
+  John: ["John", "jfield1968@gmail.com"],
+};
+
+const USERS = Object.keys(PARTICIPANTS);
+
+function normaliseIdentity(value) {
+  if (!value) return null;
+
+  const clean = String(value).trim().toLowerCase();
+
+  for (const [name, aliases] of Object.entries(PARTICIPANTS)) {
+    if (aliases.some((alias) => alias.toLowerCase() === clean)) {
+      return name;
+    }
+  }
+
+  return null;
+}
 
 export default function TasteMap() {
   const [matrix, setMatrix] = useState({});
@@ -33,8 +54,11 @@ export default function TasteMap() {
         const album = albumMap[ratingDoc.albumId];
         if (!album) return;
 
-        const rater = ratingDoc.user || ratingDoc.userName || ratingDoc.ratedBy;
-        const nominator = album.nominatedBy;
+        const rater = normaliseIdentity(
+          ratingDoc.user || ratingDoc.userName || ratingDoc.ratedBy
+        );
+
+        const nominator = normaliseIdentity(album.nominatedBy);
 
         if (!rater || !nominator) return;
         if (!temp[rater] || !temp[rater][nominator]) return;
@@ -109,8 +133,9 @@ export default function TasteMap() {
       <div className="card">
         <h2 style={{ marginTop: 0 }}>🎨 Taste Map</h2>
         <p className="smallNote" style={{ marginBottom: 0 }}>
-          Average rating given by each person to each nominator. All scores are
-          normalised to a 10-point scale.
+          Average rating given by each person to each nominator. Website email
+          accounts and 1001 archive names are merged into the same four
+          participant names.
         </p>
       </div>
 
@@ -189,7 +214,9 @@ export default function TasteMap() {
         </table>
 
         <p className="smallNote" style={{ marginTop: 12, marginBottom: 0 }}>
-          Tip: hover over a cell to see the full rater/nominator summary.
+          Note: the rater/nominator heatmap only includes albums nominated by a
+          named club member. 1001 archive scores are normalised and can be used
+          in future taste-analysis views, but they do not have a club nominator.
         </p>
       </div>
     </div>
