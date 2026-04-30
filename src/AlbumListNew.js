@@ -56,6 +56,8 @@ async function fetchTracksFromLastFM(artist, album) {
 }
 
 export default function AlbumListNew() {
+  const [user, setUser] = useState(null);
+
   const [albums, setAlbums] = useState([]);
   const [ratingsByAlbum, setRatingsByAlbum] = useState({});
   const [allRatings, setAllRatings] = useState([]);
@@ -67,11 +69,18 @@ export default function AlbumListNew() {
   const [nominators, setNominators] = useState([]);
   const [selectedNominator, setSelectedNominator] = useState("All");
   const [sortOrder, setSortOrder] = useState("newest"); // newest | rating
+  const [showUnratedOnly, setShowUnratedOnly] = useState(false);
 
   const [expanded, setExpanded] = useState({});
   const [tracksByAlbum, setTracksByAlbum] = useState({}); // albumId -> string[]
 
   const todayKey = useMemo(() => formatLondonDateKey(), []);
+
+  // Auth
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged((u) => setUser(u));
+    return () => unsub();
+  }, []);
 
   // Albums
   useEffect(() => {
@@ -99,36 +108,64 @@ export default function AlbumListNew() {
     const unsub = onSnapshot(collection(db, "ratings"), (snapshot) => {
       const map = {};
       const all = [];
+      const myDrafts = {};
 
       snapshot.forEach((d) => {
         const r = d.data();
         all.push({ id: d.id, ...r });
 
         const { albumId, score } = r;
+        if (!albumId) return;
+
         if (!map[albumId]) map[albumId] = [];
         map[albumId].push(Number(score));
+
+        if (user?.uid && r.userId === user.uid) {
+          myDrafts[albumId] = Number(score);
+        }
       });
 
       const avg = {};
       Object.keys(map).forEach((albumId) => {
         const scores = map[albumId];
-        const average = scores.reduce((s, v) => s + v, 0) / scores.length;
+        const validScores = scores.filter((s) => !Number.isNaN(s));
+        if (validScores.length === 0) return;
+
+        const average =
+          validScores.reduce((s, v) => s + v, 0) / validScores.length;
         avg[albumId] = average.toFixed(1);
       });
 
       setAllRatings(all);
       setRatingsByAlbum(avg);
+      setRatingsDraft((prev) => ({ ...prev, ...myDrafts }));
     });
 
     return () => unsub();
-  }, []);
+  }, [user?.uid]);
+
+  const myRatedAlbumIds = useMemo(() => {
+    if (!user?.uid) return new Set();
+
+    return new Set(
+      allRatings
+        .filter((r) => r.userId === user.uid)
+        .map((r) => r.albumId)
+        .filter(Boolean)
+    );
+  }, [allRatings, user?.uid]);
+
+  const unratedAlbums = useMemo(() => {
+    if (!user?.uid) return [];
+    return albums.filter((album) => !myRatedAlbumIds.has(album.id));
+  }, [albums, myRatedAlbumIds, user?.uid]);
 
   async function handleRate(albumId, value) {
-    const user = auth.currentUser;
-    if (!user) return;
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
 
-    const userId = user.uid;
-    const userEmail = user.email;
+    const userId = currentUser.uid;
+    const userEmail = currentUser.email;
     const comment =
       prompt("Optional: Leave a short comment about this album") || "";
 
@@ -153,6 +190,10 @@ export default function AlbumListNew() {
       }, 2000);
     } catch (e) {
       console.error("Rating error:", e?.message || e);
+      setFeedback((prev) => ({ ...prev, [albumId]: "Failed to save rating" }));
+      setTimeout(() => {
+        setFeedback((prev) => ({ ...prev, [albumId]: "" }));
+      }, 2500);
     }
   }
 
@@ -175,13 +216,18 @@ export default function AlbumListNew() {
     .filter((a) =>
       selectedNominator === "All" ? true : a.nominatedBy === selectedNominator
     )
+    .filter((a) => {
+      if (!showUnratedOnly) return true;
+      if (!user?.uid) return true;
+      return !myRatedAlbumIds.has(a.id);
+    })
     .sort((a, b) => {
       if (sortOrder === "rating") {
         const avgA = parseFloat(ratingsByAlbum[a.id] || "0");
         const avgB = parseFloat(ratingsByAlbum[b.id] || "0");
         return avgB - avgA;
       }
-      // newest first
+
       const da = a.nominationDate?.toDate?.() || new Date(0);
       const dbb = b.nominationDate?.toDate?.() || new Date(0);
       return dbb - da;
@@ -190,6 +236,28 @@ export default function AlbumListNew() {
   return (
     <div style={{ marginTop: "1rem" }}>
       <h2 style={{ marginBottom: 8 }}>Historic Nominations</h2>
+
+      {user ? (
+        <div className="albumCard" style={{ marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <strong>Albums still to rate</strong>
+              <p className="smallNote" style={{ margin: "4px 0 0 0" }}>
+                You have <strong>{unratedAlbums.length}</strong>{" "}
+                {unratedAlbums.length === 1 ? "album" : "albums"} still to rate.
+              </p>
+            </div>
+
+            <button
+              className="expandBtn"
+              type="button"
+              onClick={() => setShowUnratedOnly((prev) => !prev)}
+            >
+              {showUnratedOnly ? "Show all albums" : "Show unrated only"}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="controlsRow">
         <div className="controlItem">
@@ -243,10 +311,10 @@ export default function AlbumListNew() {
             const avg = ratingsByAlbum[album.id];
             const dateKey = toDateKeyFromTimestamp(album.nominationDate);
             const isTodayAlbum = dateKey && dateKey === todayKey;
+            const hasRated = user?.uid ? myRatedAlbumIds.has(album.id) : false;
 
             return (
               <div className="albumCard" key={album.id}>
-                {/* COLLAPSED HEADER ROW (ALWAYS THUMBNAIL) */}
                 <div className="albumRow">
                   <div className="albumThumb">
                     {album.coverUrl ? (
@@ -267,7 +335,8 @@ export default function AlbumListNew() {
                     </p>
 
                     <p className="albumSub">
-                      Nominated by <strong>{album.nominatedBy || "Unknown"}</strong>
+                      Nominated by{" "}
+                      <strong>{album.nominatedBy || "Unknown"}</strong>
                       {avg ? (
                         <>
                           {" "}
@@ -280,8 +349,21 @@ export default function AlbumListNew() {
                           · <span className="muted">No ratings yet</span>
                         </>
                       )}
+
+                      {user && !hasRated ? (
+                        <span
+                          className="badgeFriday"
+                          style={{ marginLeft: 10 }}
+                        >
+                          Not rated by you
+                        </span>
+                      ) : null}
+
                       {isTodayAlbum ? (
-                        <span className="badgeFriday" style={{ marginLeft: 10 }}>
+                        <span
+                          className="badgeFriday"
+                          style={{ marginLeft: 10 }}
+                        >
                           Today’s album
                         </span>
                       ) : null}
@@ -296,7 +378,6 @@ export default function AlbumListNew() {
                   </button>
                 </div>
 
-                {/* EXPANDED DETAILS */}
                 {expanded[album.id] ? (
                   <div className="albumExpanded">
                     <div className="albumExpandedGrid">
@@ -317,7 +398,9 @@ export default function AlbumListNew() {
 
                           <select
                             value={ratingsDraft[album.id] || ""}
-                            onChange={(e) => handleRate(album.id, e.target.value)}
+                            onChange={(e) =>
+                              handleRate(album.id, e.target.value)
+                            }
                             style={{ maxWidth: 180 }}
                           >
                             <option value="">--</option>
@@ -330,7 +413,9 @@ export default function AlbumListNew() {
                         </div>
 
                         {feedback[album.id] ? (
-                          <div className="feedbackOk">{feedback[album.id]}</div>
+                          <div className="feedbackOk">
+                            {feedback[album.id]}
+                          </div>
                         ) : null}
 
                         <div style={{ marginTop: 10 }}>
@@ -344,8 +429,7 @@ export default function AlbumListNew() {
                               </ol>
                             ) : (
                               <p className="smallNote" style={{ marginTop: 6 }}>
-                                No tracks found for this album (Last.fm can be patchy on
-                                some entries).
+                                No tracks found for this album.
                               </p>
                             )
                           ) : (
