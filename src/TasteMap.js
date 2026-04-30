@@ -3,7 +3,7 @@ import { db } from "./firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 
 const PARTICIPANTS = {
-  Scott: ["Scott", "scottcee01@gmail.com"],
+  Scott: ["Scott", "scottcee01@gmail.com", "scottcee01@googlemail.com"],
   Matt: ["Matt", "matthodges@outlook.com"],
   Dave: ["Dave", "davews1621@gmail.com"],
   John: ["John", "jfield1968@gmail.com"],
@@ -55,10 +55,18 @@ export default function TasteMap() {
         if (!album) return;
 
         const rater = normaliseIdentity(
-          ratingDoc.user || ratingDoc.userName || ratingDoc.ratedBy
+          ratingDoc.user ||
+            ratingDoc.userName ||
+            ratingDoc.ratedBy ||
+            ratingDoc.userEmail
         );
 
-        const nominator = normaliseIdentity(album.nominatedBy);
+        const nominator = normaliseIdentity(
+          album.nominatedBy ||
+            album.nominatedByEmail ||
+            album.userEmail ||
+            album.user
+        );
 
         if (!rater || !nominator) return;
         if (!temp[rater] || !temp[rater][nominator]) return;
@@ -133,7 +141,10 @@ export default function TasteMap() {
       <div className="card">
         <h2 style={{ marginTop: 0 }}>🎨 Taste Map</h2>
         <p className="smallNote" style={{ marginBottom: 0 }}>
-          Average rating given by each person to each nominator. 
+          Average rating given by each person to each nominator. Website email
+          accounts and 1001 archive names are merged into the same four
+          participant names. 1001 archive scores are normalised to a 10-point
+          scale.
         </p>
       </div>
 
@@ -212,7 +223,7 @@ export default function TasteMap() {
         </table>
 
         <p className="smallNote" style={{ marginTop: 12, marginBottom: 0 }}>
-          
+          Tip: hover over a cell to see the full rater/nominator summary.
         </p>
       </div>
     </div>
