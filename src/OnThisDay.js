@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { db } from "./firebase";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 function getLondonDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", {
@@ -17,22 +17,20 @@ function getLondonDateParts(date = new Date()) {
   };
 }
 
-function getPartsFromTimestamp(ts) {
-  if (!ts?.toDate) return null;
-  return getLondonDateParts(ts.toDate());
-}
-
 export default function OnThisDay() {
   const [albums, setAlbums] = useState([]);
   const [ratingsByAlbum, setRatingsByAlbum] = useState({});
 
   const todayParts = useMemo(() => getLondonDateParts(new Date()), []);
+  const todayDay = Number(todayParts.day);
+  const todayMonth = Number(todayParts.month);
   const todayLabel = `${todayParts.day}/${todayParts.month}`;
 
   useEffect(() => {
     const qAlbums = query(
       collection(db, "albums"),
-      orderBy("nominationDate", "desc")
+      where("generatedDay", "==", todayDay),
+      where("generatedMonth", "==", todayMonth)
     );
 
     const unsub = onSnapshot(qAlbums, (snapshot) => {
@@ -40,7 +38,7 @@ export default function OnThisDay() {
     });
 
     return () => unsub();
-  }, []);
+  }, [todayDay, todayMonth]);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "ratings"), (snapshot) => {
@@ -50,16 +48,20 @@ export default function OnThisDay() {
         const r = d.data();
         if (!r.albumId) return;
 
+        const value = Number(r.rating ?? r.score);
+        if (Number.isNaN(value)) return;
+
         if (!map[r.albumId]) map[r.albumId] = [];
-        map[r.albumId].push(Number(r.score));
+        map[r.albumId].push(value);
       });
 
       const avg = {};
-      Object.keys(map).forEach((albumId) => {
-        const scores = map[albumId].filter((s) => !Number.isNaN(s));
-        if (scores.length === 0) return;
 
-        const average = scores.reduce((sum, val) => sum + val, 0) / scores.length;
+      Object.keys(map).forEach((albumId) => {
+        const scores = map[albumId];
+        const average =
+          scores.reduce((sum, val) => sum + val, 0) / scores.length;
+
         avg[albumId] = {
           average: average.toFixed(1),
           count: scores.length,
@@ -72,52 +74,48 @@ export default function OnThisDay() {
     return () => unsub();
   }, []);
 
-  const matches = useMemo(() => {
-    return albums
-      .map((album) => {
-        const parts = getPartsFromTimestamp(album.nominationDate);
-        return { album, parts };
-      })
-      .filter(({ parts }) => {
-        if (!parts) return false;
+  const sortedAlbums = useMemo(() => {
+    return [...albums].sort((a, b) => {
+      const aDate = a.generatedDate?.toDate?.();
+      const bDate = b.generatedDate?.toDate?.();
 
-        return (
-          parts.day === todayParts.day &&
-          parts.month === todayParts.month &&
-          parts.year !== todayParts.year
-        );
-      })
-      .sort((a, b) => Number(b.parts.year) - Number(a.parts.year));
-  }, [albums, todayParts.day, todayParts.month, todayParts.year]);
+      if (!aDate || !bDate) return 0;
+
+      return bDate.getFullYear() - aDate.getFullYear();
+    });
+  }, [albums]);
 
   return (
     <div style={{ marginTop: 14 }}>
       <div className="card">
         <h2 style={{ marginTop: 0 }}>📅 On This Day</h2>
         <p className="smallNote" style={{ marginBottom: 0 }}>
-          Albums nominated on this date in previous years:{" "}
-          <strong>{todayLabel}</strong>
+          Albums generated for this date: <strong>{todayLabel}</strong>
         </p>
       </div>
 
-      {matches.length === 0 ? (
+      {sortedAlbums.length === 0 ? (
         <div className="card" style={{ marginTop: 12 }}>
           <p className="smallNote" style={{ margin: 0 }}>
-            Nothing found for this date yet. As your archive grows, this page
-            will become more interesting.
+            Nothing found for this date yet.
           </p>
         </div>
       ) : (
         <div style={{ marginTop: 12 }}>
-          {matches.map(({ album, parts }) => {
+          {sortedAlbums.map((album) => {
             const rating = ratingsByAlbum[album.id];
+            const date = album.generatedDate?.toDate?.();
+            const year = date ? date.getFullYear() : "";
+
+            const albumTitle = album.title || album.album || "Untitled album";
+            const artist = album.artist || "Unknown artist";
 
             return (
               <div className="albumCard" key={album.id}>
                 <div className="albumRow">
                   <div className="albumThumb">
                     {album.coverUrl ? (
-                      <img src={album.coverUrl} alt={`${album.title} cover`} />
+                      <img src={album.coverUrl} alt={`${albumTitle} cover`} />
                     ) : (
                       <span style={{ fontSize: 12, color: "#6b7280" }}>
                         No image
@@ -127,17 +125,29 @@ export default function OnThisDay() {
 
                   <div>
                     <p className="albumTitle">
-                      {album.title}{" "}
+                      {albumTitle}{" "}
                       <span style={{ fontWeight: 500, color: "#6b7280" }}>
-                        — {album.artist}
+                        — {artist}
                       </span>
                     </p>
 
                     <p className="albumSub">
-                      <strong>{parts.year}</strong>
-                      {" · "}
-                      Nominated by{" "}
-                      <strong>{album.nominatedBy || "Unknown"}</strong>
+                      {year ? (
+                        <>
+                          <strong>{year}</strong>
+                          {" · "}
+                        </>
+                      ) : null}
+
+                      {album.source === "1001_albums" ? (
+                        <>1001 Albums archive</>
+                      ) : (
+                        <>
+                          Nominated by{" "}
+                          <strong>{album.nominatedBy || "Unknown"}</strong>
+                        </>
+                      )}
+
                       {rating ? (
                         <>
                           {" · "}
@@ -157,7 +167,7 @@ export default function OnThisDay() {
                     </p>
                   </div>
 
-                  <span className="badgeFriday">{parts.year}</span>
+                  {year ? <span className="badgeFriday">{year}</span> : null}
                 </div>
               </div>
             );
