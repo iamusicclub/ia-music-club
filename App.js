@@ -13,10 +13,7 @@ import NominateAlbum from "./NominateAlbum";
 import AlbumListNew from "./AlbumListNew";
 import ScheduleViewer from "./ScheduleViewer";
 import NewMusicRecommends from "./NewMusicRecommends";
-
-// ✅ Only keep this import while you are actively generating/patching schedules,
-// then remove it again.
-import GenerateSchedule from "./GenerateSchedule";
+import OnThisDay from "./OnThisDay";
 
 function formatLondonDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -35,26 +32,21 @@ function formatLondonDateKey(date = new Date()) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [todaysSchedule, setTodaysSchedule] = useState(null);
-
-  // home | schedule | recommends
   const [activeTab, setActiveTab] = useState("home");
 
   const todayKey = useMemo(() => formatLondonDateKey(), []);
 
-  // Persist login (so users log in once, not daily)
   useEffect(() => {
     setPersistence(auth, browserLocalPersistence).catch((error) => {
       console.error("❌ Persistence setup error:", error.message);
     });
   }, []);
 
-  // Auth tracking
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsubscribe();
   }, []);
 
-  // Load today's schedule entry (for header)
   useEffect(() => {
     const loadTodaySchedule = async () => {
       try {
@@ -114,12 +106,21 @@ export default function App() {
           >
             Home
           </button>
+
           <button
             className={activeTab === "schedule" ? "active" : ""}
             onClick={() => setActiveTab("schedule")}
           >
             Schedule
           </button>
+
+          <button
+            className={activeTab === "onThisDay" ? "active" : ""}
+            onClick={() => setActiveTab("onThisDay")}
+          >
+            On This Day
+          </button>
+
           <button
             className={activeTab === "recommends" ? "active" : ""}
             onClick={() => setActiveTab("recommends")}
@@ -148,9 +149,10 @@ export default function App() {
         <div className="card">
           <h2 style={{ marginTop: 0 }}>Sign in</h2>
           <p className="smallNote" style={{ marginTop: 6 }}>
-            Your Firestore rules currently require authentication for reading/writing club data,
-            so users must log in at least once. With persistence enabled, they should stay logged
-            in on the same device/browser.
+            Your Firestore rules currently require authentication for
+            reading/writing club data, so users must log in at least once. With
+            persistence enabled, they should stay logged in on the same
+            device/browser.
           </p>
           <button className="btn" onClick={login} style={{ marginTop: 10 }}>
             Login
@@ -158,7 +160,6 @@ export default function App() {
         </div>
       ) : (
         <>
-          {/* Always show today’s nominator card (regardless of tab) */}
           <div className="card">
             <h2 style={{ margin: 0 }}>🎤 Today’s Nominator</h2>
             <p style={{ margin: "8px 0 0 0" }}>
@@ -171,7 +172,11 @@ export default function App() {
                       <ul style={{ margin: "6px 0 0 18px" }}>
                         {(todaysSchedule.links || []).map((u, idx) => (
                           <li key={idx}>
-                            <a href={u} target="_blank" rel="noopener noreferrer">
+                            <a
+                              href={u}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
                               {u}
                             </a>
                           </li>
@@ -188,7 +193,6 @@ export default function App() {
             </p>
           </div>
 
-          {/* Tab pages */}
           {activeTab === "home" ? (
             <>
               <div style={{ marginTop: 14 }}>
@@ -198,10 +202,9 @@ export default function App() {
               <AlbumListNew />
             </>
           ) : activeTab === "schedule" ? (
-            <>
-              <ScheduleViewer />
-
-            </>
+            <ScheduleViewer />
+          ) : activeTab === "onThisDay" ? (
+            <OnThisDay />
           ) : (
             <NewMusicRecommends />
           )}
