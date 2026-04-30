@@ -190,7 +190,7 @@ export default function OnThisDay() {
                         }}
                       >
                         <strong>{r.user}</strong>
-                        <span>{r.value}/10</span>
+                        <span>{r.value}/5</span>
                       </span>
                     ))}
                   </div>
