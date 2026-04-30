@@ -84,75 +84,43 @@ export default function App() {
     todaysSchedule?.userEmail === "New Music Friday 🎧" ||
     todaysSchedule?.type === "NEW_MUSIC_FRIDAY";
 
-  const navButtonStyle = (tab) => ({
-    width: "100%",
-    textAlign: "left",
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid #e5e7eb",
-    background: activeTab === tab ? "#e0ecff" : "#ffffff",
-    fontWeight: activeTab === tab ? 700 : 500,
-    cursor: "pointer",
-  });
-
   return (
-    <div
-      style={{
-        display: "flex",
-        minHeight: "100vh",
-        background: "#f8fafc",
-      }}
-    >
-      <aside
-        style={{
-          width: 230,
-          padding: 20,
-          borderRight: "1px solid #e5e7eb",
-          background: "#ffffff",
-          position: "sticky",
-          top: 0,
-          height: "100vh",
-          boxSizing: "border-box",
-        }}
-      >
-        <h1 style={{ fontSize: 22, margin: "0 0 4px 0" }}>IA Music Club</h1>
-        <div className="smallNote" style={{ marginBottom: 20 }}>
-          Today: <strong>{todayKey}</strong>
+    <div className="container">
+      {/* Header */}
+      <div className="topbar">
+        <div className="brand">
+          <h1>IA Music Club</h1>
+          <div className="sub">
+            Today: <strong>{todayKey}</strong>
+          </div>
         </div>
 
-        <div style={{ display: "grid", gap: 10 }}>
-          <button style={navButtonStyle("home")} onClick={() => setActiveTab("home")}>
-            Home
-          </button>
-
-          <button
-            style={navButtonStyle("schedule")}
-            onClick={() => setActiveTab("schedule")}
+        {/* ✅ Dropdown navigation */}
+        <div style={{ marginTop: 10 }}>
+          <select
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value)}
+            style={{
+              padding: "10px",
+              borderRadius: 8,
+              border: "1px solid #e5e7eb",
+              fontSize: 14,
+              width: "100%",
+              maxWidth: 260,
+            }}
           >
-            Schedule
-          </button>
-
-          <button
-            style={navButtonStyle("onthisday")}
-            onClick={() => setActiveTab("onthisday")}
-          >
-            On This Day
-          </button>
-
-          <button
-            style={navButtonStyle("recommends")}
-            onClick={() => setActiveTab("recommends")}
-          >
-            New Music Recommends
-          </button>
+            <option value="home">Home</option>
+            <option value="schedule">Schedule</option>
+            <option value="onthisday">On This Day</option>
+            <option value="recommends">New Music Recommends</option>
+          </select>
         </div>
 
-        <div style={{ marginTop: 24 }}>
+        {/* Auth */}
+        <div className="authRow" style={{ marginTop: 10 }}>
           {user ? (
             <>
-              <div className="pill" style={{ marginBottom: 10 }}>
-                👋 {user.email}
-              </div>
+              <span className="pill">👋 {user.email}</span>
               <button className="btn secondary" onClick={logout}>
                 Logout
               </button>
@@ -163,71 +131,62 @@ export default function App() {
             </button>
           )}
         </div>
-      </aside>
+      </div>
 
-      <main
-        className="container"
-        style={{
-          flex: 1,
-          maxWidth: 980,
-          margin: "0 auto",
-          padding: "24px 28px",
-        }}
-      >
-        {!user ? (
+      {/* Body */}
+      {!user ? (
+        <div className="card">
+          <h2 style={{ marginTop: 0 }}>Sign in</h2>
+          <button className="btn" onClick={login} style={{ marginTop: 10 }}>
+            Login
+          </button>
+        </div>
+      ) : (
+        <>
           <div className="card">
-            <h2 style={{ marginTop: 0 }}>Sign in</h2>
-            <button className="btn" onClick={login} style={{ marginTop: 10 }}>
-              Login
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="card">
-              <h2 style={{ margin: 0 }}>🎤 Today’s Nominator</h2>
-              <p style={{ margin: "8px 0 0 0" }}>
-                {todaysSchedule ? (
-                  isNewMusicFriday ? (
-                    <>
-                      <strong>New Music Friday 🎧</strong>
-                      <div className="smallNote" style={{ marginTop: 6 }}>
-                        <ul style={{ margin: "6px 0 0 18px" }}>
-                          {(todaysSchedule.links || []).map((u, idx) => (
-                            <li key={idx}>
-                              <a href={u} target="_blank" rel="noopener noreferrer">
-                                {u}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </>
-                  ) : (
-                    <strong>{todaysSchedule.userEmail || "Unknown"}</strong>
-                  )
+            <h2 style={{ margin: 0 }}>🎤 Today’s Nominator</h2>
+            <p style={{ margin: "8px 0 0 0" }}>
+              {todaysSchedule ? (
+                isNewMusicFriday ? (
+                  <>
+                    <strong>New Music Friday 🎧</strong>
+                    <div className="smallNote" style={{ marginTop: 6 }}>
+                      <ul style={{ margin: "6px 0 0 18px" }}>
+                        {(todaysSchedule.links || []).map((u, idx) => (
+                          <li key={idx}>
+                            <a href={u} target="_blank" rel="noopener noreferrer">
+                              {u}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
                 ) : (
-                  <strong>No nominator scheduled for today</strong>
-                )}
-              </p>
-            </div>
+                  <strong>{todaysSchedule.userEmail || "Unknown"}</strong>
+                )
+              ) : (
+                <strong>No nominator scheduled for today</strong>
+              )}
+            </p>
+          </div>
 
-            {activeTab === "home" ? (
-              <>
-                <div style={{ marginTop: 14 }}>
-                  <NominateAlbum />
-                </div>
-                <AlbumListNew />
-              </>
-            ) : activeTab === "schedule" ? (
-              <ScheduleViewer />
-            ) : activeTab === "onthisday" ? (
-              <OnThisDay />
-            ) : (
-              <NewMusicRecommends />
-            )}
-          </>
-        )}
-      </main>
+          {activeTab === "home" ? (
+            <>
+              <div style={{ marginTop: 14 }}>
+                <NominateAlbum />
+              </div>
+              <AlbumListNew />
+            </>
+          ) : activeTab === "schedule" ? (
+            <ScheduleViewer />
+          ) : activeTab === "onthisday" ? (
+            <OnThisDay />
+          ) : (
+            <NewMusicRecommends />
+          )}
+        </>
+      )}
     </div>
   );
 }
