@@ -17,8 +17,8 @@ import OnThisDay from "./OnThisDay";
 import TasteMap from "./TasteMap";
 
 const PARTICIPANTS = {
-  "scottcee01@gmail.com": "Scott",
-  "matthodges@outlook.com": "Matt",
+  "scottcee01@googlemail.com": "Scott",
+  "mattdhodges@outlook.com": "Matt",
   "davews1621@gmail.com": "Dave",
   "jfield1968@gmail.com": "John",
   Scott: "Scott",
