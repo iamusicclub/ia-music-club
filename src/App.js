@@ -14,6 +14,27 @@ import AlbumListNew from "./AlbumListNew";
 import ScheduleViewer from "./ScheduleViewer";
 import NewMusicRecommends from "./NewMusicRecommends";
 import OnThisDay from "./OnThisDay";
+import TasteMap from "./TasteMap";
+
+const PARTICIPANTS = {
+  "scottcee01@gmail.com": "Scott",
+  "matthodges@outlook.com": "Matt",
+  "davews1621@gmail.com": "Dave",
+  "jfield1968@gmail.com": "John",
+  Scott: "Scott",
+  Matt: "Matt",
+  Dave: "Dave",
+  John: "John",
+};
+
+function displayName(value) {
+  if (!value) return "Unknown";
+
+  const clean = String(value).trim();
+  const lower = clean.toLowerCase();
+
+  return PARTICIPANTS[clean] || PARTICIPANTS[lower] || clean;
+}
 
 function formatLondonDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -84,9 +105,11 @@ export default function App() {
     todaysSchedule?.userEmail === "New Music Friday 🎧" ||
     todaysSchedule?.type === "NEW_MUSIC_FRIDAY";
 
+  const signedInName = displayName(user?.email);
+  const todaysNominatorName = displayName(todaysSchedule?.userEmail);
+
   return (
     <div className="container">
-      {/* Header */}
       <div className="topbar">
         <div className="brand">
           <h1>IA Music Club</h1>
@@ -95,7 +118,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* ✅ Dropdown navigation */}
         <div style={{ marginTop: 10 }}>
           <select
             value={activeTab}
@@ -113,14 +135,14 @@ export default function App() {
             <option value="schedule">Schedule</option>
             <option value="onthisday">On This Day</option>
             <option value="recommends">New Music Recommends</option>
+            <option value="tastemap">Taste Map</option>
           </select>
         </div>
 
-        {/* Auth */}
         <div className="authRow" style={{ marginTop: 10 }}>
           {user ? (
             <>
-              <span className="pill">👋 {user.email}</span>
+              <span className="pill">👋 {signedInName}</span>
               <button className="btn secondary" onClick={logout}>
                 Logout
               </button>
@@ -133,7 +155,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Body */}
       {!user ? (
         <div className="card">
           <h2 style={{ marginTop: 0 }}>Sign in</h2>
@@ -163,7 +184,7 @@ export default function App() {
                     </div>
                   </>
                 ) : (
-                  <strong>{todaysSchedule.userEmail || "Unknown"}</strong>
+                  <strong>{todaysNominatorName}</strong>
                 )
               ) : (
                 <strong>No nominator scheduled for today</strong>
@@ -182,6 +203,8 @@ export default function App() {
             <ScheduleViewer />
           ) : activeTab === "onthisday" ? (
             <OnThisDay />
+          ) : activeTab === "tastemap" ? (
+            <TasteMap />
           ) : (
             <NewMusicRecommends />
           )}
