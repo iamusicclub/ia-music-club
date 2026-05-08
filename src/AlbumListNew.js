@@ -255,7 +255,14 @@ export default function AlbumListNew() {
 
       {user ? (
         <div className="albumCard" style={{ marginBottom: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
             <div>
               <strong>Albums still to rate</strong>
               <p className="smallNote" style={{ margin: "4px 0 0 0" }}>
@@ -353,6 +360,13 @@ export default function AlbumListNew() {
                     <p className="albumSub">
                       Nominated by{" "}
                       <strong>{displayName(album.nominatedBy)}</strong>
+                      {dateKey ? (
+                        <>
+                          {" "}
+                          · <span className="muted">Nominated:</span>{" "}
+                          <strong>{dateKey}</strong>
+                        </>
+                      ) : null}
                       {avg ? (
                         <>
                           {" "}
