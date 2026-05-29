@@ -385,8 +385,8 @@ export default function HallOfFame() {
                 ...item,
                 extra:
                   item.score === "5.00/5"
-                    ? "Universal five-star album"
-                    : "Consensus classic",
+                    ? "1001 albums to hear before you die"
+                    : "1001 albums to hear before you die",
               }}
               coverUrl={getCover(item)}
               badge={item.score}
