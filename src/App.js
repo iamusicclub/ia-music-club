@@ -15,10 +15,13 @@ import ScheduleViewer from "./ScheduleViewer";
 import NewMusicRecommends from "./NewMusicRecommends";
 import OnThisDay from "./OnThisDay";
 import TasteMap from "./TasteMap";
+import HallOfFame from "./HallOfFame";
 
 const PARTICIPANTS = {
   "scottcee01@googlemail.com": "Scott",
+  "scottcee01@gmail.com": "Scott",
   "mattdhodges@outlook.com": "Matt",
+  "matthodges@outlook.com": "Matt",
   "davews1621@gmail.com": "Dave",
   "jfield1968@gmail.com": "John",
   Scott: "Scott",
@@ -136,6 +139,7 @@ export default function App() {
             <option value="onthisday">On This Day</option>
             <option value="recommends">New Music Recommends</option>
             <option value="tastemap">Taste Map</option>
+            <option value="halloffame">Hall of Fame</option>
           </select>
         </div>
 
@@ -205,6 +209,8 @@ export default function App() {
             <OnThisDay />
           ) : activeTab === "tastemap" ? (
             <TasteMap />
+          ) : activeTab === "halloffame" ? (
+            <HallOfFame />
           ) : (
             <NewMusicRecommends />
           )}
