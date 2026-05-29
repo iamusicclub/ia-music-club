@@ -3,38 +3,48 @@ import { db } from "./firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 
 const WEBSITE_SEASON_START = new Date(Date.UTC(2025, 4, 30)); // 30 May 2025
-const WEBSITE_SEASON_END_DAY_OFFSET = -1; // Close each season one day earlier
+const WEBSITE_SEASON_END_DAY_OFFSET = -1;
 
-const albums1001ByYear = [
+const classicAlbums1001 = [
   {
-    year: 2021,
-    album: "Moondance",
-    artist: "Van Morrison",
-    score: "4.75/5",
+    album: "Revolver",
+    artist: "The Beatles",
+    score: "5.00/5",
   },
   {
-    year: 2022,
     album: "Sgt. Pepper's Lonely Hearts Club Band",
     artist: "The Beatles",
     score: "5.00/5",
   },
   {
-    year: 2023,
-    album: "What's Going On",
-    artist: "Marvin Gaye",
-    score: "4.50/5",
-  },
-  {
-    year: 2024,
     album: "The Stone Roses",
     artist: "The Stone Roses",
     score: "5.00/5",
   },
   {
-    year: 2025,
-    album: "In Rainbows",
+    album: "The Queen Is Dead",
+    artist: "The Smiths",
+    score: "4.75/5",
+  },
+  {
+    album: "Astral Weeks",
+    artist: "Van Morrison",
+    score: "4.75/5",
+  },
+  {
+    album: "Moondance",
+    artist: "Van Morrison",
+    score: "4.75/5",
+  },
+  {
+    album: "OK Computer",
     artist: "Radiohead",
-    score: "4.25/5",
+    score: "4.75/5",
+  },
+  {
+    album: "Tapestry",
+    artist: "Carole King",
+    score: "4.75/5",
   },
 ];
 
@@ -311,7 +321,7 @@ export default function HallOfFame() {
   }, [albums, ratings]);
 
   useEffect(() => {
-    const staticItems = [...albums1001ByYear, ...iamcAlbumsOfTheYear];
+    const staticItems = [...classicAlbums1001, ...iamcAlbumsOfTheYear];
     const dynamicItems = websiteSeasonWinners.map((season) => season.winner);
     const allItems = [...staticItems, ...dynamicItems];
 
@@ -355,25 +365,28 @@ export default function HallOfFame() {
       <div className="card">
         <h2 style={{ marginTop: 0 }}>🏆 Hall of Fame</h2>
         <p className="smallNote" style={{ marginBottom: 0 }}>
-          The club’s annual winners, archive favourites and website nomination
+          IAMC annual winners, 1001 archive favourites and website nomination
           champions.
         </p>
       </div>
 
       <div className="card" style={{ marginTop: 12 }}>
-        <h3 style={{ marginTop: 0 }}>📚 1001 Albums Winners by Year</h3>
+        <h3 style={{ marginTop: 0 }}>📚 1001 Albums Classics</h3>
         <p className="smallNote">
-          Highest-rated album from each year of the 1001 Albums listening
-          project.
+          Albums from the 1001 Albums project with a group average of 4.75/5 or
+          higher.
         </p>
 
         <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-          {albums1001ByYear.map((item) => (
+          {classicAlbums1001.map((item) => (
             <WinnerCard
-              key={`${item.year}-${item.album}`}
+              key={`${item.artist}-${item.album}`}
               item={{
                 ...item,
-                extra: `${item.year} winner`,
+                extra:
+                  item.score === "5.00/5"
+                    ? "Universal five-star album"
+                    : "Consensus classic",
               }}
               coverUrl={getCover(item)}
               badge={item.score}
@@ -385,7 +398,7 @@ export default function HallOfFame() {
       <div className="card" style={{ marginTop: 12 }}>
         <h3 style={{ marginTop: 0 }}>🎧 IAMC Album of the Year</h3>
         <p className="smallNote">
-          Internal Audit Music Club annual album winners.
+          IAMC annual best albums.
         </p>
 
         <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
@@ -408,8 +421,7 @@ export default function HallOfFame() {
       <div className="card" style={{ marginTop: 12 }}>
         <h3 style={{ marginTop: 0 }}>🌟 Website Nomination Winners</h3>
         <p className="smallNote">
-          Highest-rated album from each website nomination season. The first
-          season runs from 30 May 2025 to 29 May 2026, then closes automatically.
+          Highest-rated album from each website nomination year.
         </p>
 
         {websiteSeasonWinners.length === 0 ? (
