@@ -14,6 +14,7 @@ import AlbumListNew from "./AlbumListNew";
 import ScheduleViewer from "./ScheduleViewer";
 import NewMusicRecommends from "./NewMusicRecommends";
 import OnThisDay from "./OnThisDay";
+import GenerateSchedule from "./GenerateSchedule";
 
 function formatLondonDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -160,7 +161,7 @@ export default function App() {
         </div>
       ) : (
         <>
-          <div className="card">
+                    <div className="card">
             <h2 style={{ margin: 0 }}>🎤 Today’s Nominator</h2>
             <p style={{ margin: "8px 0 0 0" }}>
               {todaysSchedule ? (
@@ -192,6 +193,8 @@ export default function App() {
               )}
             </p>
           </div>
+
+          <GenerateSchedule />
 
           {activeTab === "home" ? (
             <>
