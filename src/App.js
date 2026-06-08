@@ -16,7 +16,7 @@ import NewMusicRecommends from "./NewMusicRecommends";
 import OnThisDay from "./OnThisDay";
 import TasteMap from "./TasteMap";
 import HallOfFame from "./HallOfFame";
-import GenerateSchedule from "./GenerateSchedule";
+
 
 const PARTICIPANTS = {
   "scottcee01@googlemail.com": "Scott",
@@ -197,7 +197,6 @@ export default function App() {
             </p>
           </div>
 
-          <GenerateSchedule />
 
           {activeTab === "home" ? (
             <>
