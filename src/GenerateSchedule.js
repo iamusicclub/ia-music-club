@@ -1,62 +1,26 @@
 import { useEffect, useState } from "react";
 import { auth, db } from "./firebase";
-import {
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  collection,
-  getDocs,
-} from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 /**
  * ===========================
- * CONFIG — CHANGE THESE ONLY
+ * CONFIG
  * ===========================
  */
 
-/**
- * MODE OPTIONS:
- * 1) "override_today_only"
- *    - Writes ONLY today's nominationsSchedule doc (London date),
- *      assigning it to your user (even if Friday).
- *    - Does NOT generate future dates.
- *
- * 2) "generate_range"
- *    - Generates a schedule range starting from START_DATE
- *    - Uses New Music Friday rules for Fridays
- *
- * 3) "fix_friday_links"
- *    - Updates existing (future/today) NEW_MUSIC_FRIDAY docs in Firestore
- *      so your UI reflects the new links immediately.
- */
-const MODE = "fix_friday_links"; // <-- set back to "override_today_only" or remove component after running
+const MODE = "generate_range";
 
-// Used only when MODE === "generate_range"
-const START_DATE = "2025-06-02";
-const DAYS_TO_ASSIGN = 60;
-
-// Safety: if false, generator will NOT overwrite existing docs (generate_range only)
+const START_DATE = "2026-06-08";
+const DAYS_TO_ASSIGN = 260;
 const OVERWRITE_EXISTING = false;
 
-// Your “today override” identity (must match your Firebase Auth user)
-const OVERRIDE_USER = {
-  userId: "UJyzC0IXFAbt4RLsfwbFB6u35kz1",
-  email: "scottcee01@googlemail.com",
-};
-
-// Rotation members (only used for normal weekday assignment)
 const MEMBERS = [
   { userId: "Z2FQNDa3UwRUVDTqWcSEDJA5kvp2", email: "mattdhodges@outlook.com" },
   { userId: "uMKdZGXTnafAQtX4QN80ShBYRhh2", email: "davews1621@gmail.com" },
   { userId: "4ssyOFngYaV6liJMn3qHwtzQzAD2", email: "jfield1968@gmail.com" },
-  {
-    userId: "UJyzC0IXFAbt4RLsfwbFB6u35kz1",
-    email: "scottcee01@googlemail.com",
-  },
+  { userId: "UJyzC0IXFAbt4RLsfwbFB6u35kz1", email: "scottcee01@googlemail.com" },
 ];
 
-// Friday links (FIXED: valid strings)
 const NEW_MUSIC_FRIDAY = {
   label: "New Music Friday 🎧",
   links: [
@@ -65,43 +29,26 @@ const NEW_MUSIC_FRIDAY = {
   ],
 };
 
-/**
- * ===========================
- * BANK HOLIDAYS
- * ===========================
- */
-const UK_BANK_HOLIDAYS_2025 = [
-  "2025-01-01",
-  "2025-04-18",
-  "2025-04-21",
-  "2025-05-05",
-  "2025-05-26",
-  "2025-08-25",
-  "2025-12-25",
-  "2025-12-26",
-];
-
-const UK_BANK_HOLIDAYS_2026 = [
-  "2026-01-01",
-  "2026-04-03", // Good Friday
-  "2026-04-06", // Easter Monday
-  "2026-05-04", // Early May
-  "2026-05-25", // Spring
-  "2026-08-31", // Summer
-  "2026-12-25",
-  "2026-12-28", // Boxing Day substitute (26th Saturday)
-];
-
 const UK_BANK_HOLIDAYS = new Set([
-  ...UK_BANK_HOLIDAYS_2025,
-  ...UK_BANK_HOLIDAYS_2026,
+  "2026-01-01",
+  "2026-04-03",
+  "2026-04-06",
+  "2026-05-04",
+  "2026-05-25",
+  "2026-08-31",
+  "2026-12-25",
+  "2026-12-28",
+
+  "2027-01-01",
+  "2027-03-26",
+  "2027-03-29",
+  "2027-05-03",
+  "2027-05-31",
+  "2027-08-30",
+  "2027-12-27",
+  "2027-12-28",
 ]);
 
-/**
- * ===========================
- * DATE HELPERS (Europe/London)
- * ===========================
- */
 function formatLondonDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/London",
@@ -130,18 +77,13 @@ function londonDayOfWeek(dateStr) {
   return map[weekday];
 }
 
-/**
- * ===========================
- * CORE WRITERS
- * ===========================
- */
 async function writeScheduleDoc(dateStr, payload) {
   const ref = doc(db, "nominationsSchedule", dateStr);
 
   if (!OVERWRITE_EXISTING) {
     const existing = await getDoc(ref);
     if (existing.exists()) {
-      console.log(`⏭️ Skipping ${dateStr} (already exists).`);
+      console.log(`⏭️ Skipping ${dateStr} because it already exists.`);
       return { skipped: true };
     }
   }
@@ -150,44 +92,18 @@ async function writeScheduleDoc(dateStr, payload) {
   return { skipped: false };
 }
 
-async function overrideTodayOnly() {
-  const user = auth.currentUser;
-  if (!user) {
-    console.warn("🔒 Not authenticated. Log in first, then refresh.");
-    return;
-  }
-
-  const todayStr = formatLondonDateKey(new Date());
-  const dow = londonDayOfWeek(todayStr);
-
-  const ref = doc(db, "nominationsSchedule", todayStr);
-  await setDoc(ref, {
-    userId: OVERRIDE_USER.userId,
-    userEmail: OVERRIDE_USER.email,
-    assignedAt: new Date().toISOString(),
-    override: true,
-    overrideReason: "Testing track listing / today-only override",
-    note:
-      dow === 5
-        ? "Override applied on Friday (New Music Friday bypassed)"
-        : "Override applied",
-    type: "USER",
-  });
-
-  console.log(`✅ TODAY OVERRIDE: ${todayStr} → ${OVERRIDE_USER.email}`);
-}
-
 async function generateRange(startDateStr, daysToAssign) {
   const user = auth.currentUser;
+
   if (!user) {
-    console.warn("🔒 Not authenticated. Log in to generate schedule.");
+    console.warn("Not authenticated. Log in first.");
     return;
   }
 
-  console.log(`🔐 Authenticated as ${user.email}`);
-  console.log("🚀 Starting schedule generation...");
+  console.log(`Authenticated as ${user.email}`);
+  console.log(`Generating ${daysToAssign} assignable schedule days from ${startDateStr}`);
 
-  let current = new Date(startDateStr);
+  let current = new Date(`${startDateStr}T12:00:00Z`);
   let assignedDays = 0;
   let memberIndex = 0;
 
@@ -207,8 +123,9 @@ async function generateRange(startDateStr, daysToAssign) {
           type: "NEW_MUSIC_FRIDAY",
         });
 
-        if (!res.skipped)
+        if (!res.skipped) {
           console.log(`🎧 Assigned ${dateStr} → New Music Friday`);
+        }
       } else {
         const member = MEMBERS[memberIndex % MEMBERS.length];
 
@@ -228,67 +145,12 @@ async function generateRange(startDateStr, daysToAssign) {
       assignedDays++;
     }
 
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
-  console.log("🎉 Schedule generation complete.");
+  console.log("Schedule generation complete.");
 }
 
-/**
- * ===========================
- * PATCH EXISTING NMF DOCS
- * ===========================
- * Updates the links on already-created Friday docs.
- * This is what you need if the UI is still showing old URLs.
- */
-async function fixFridayLinks() {
-  const user = auth.currentUser;
-  if (!user) {
-    console.warn("🔒 Not authenticated. Log in to apply fixes.");
-    return;
-  }
-
-  const todayStr = formatLondonDateKey(new Date());
-
-  console.log("🛠️ Patching existing New Music Friday docs...");
-  const snapshot = await getDocs(collection(db, "nominationsSchedule"));
-
-  let updated = 0;
-  let scanned = 0;
-
-  for (const d of snapshot.docs) {
-    scanned++;
-    const dateStr = d.id;
-    const data = d.data() || {};
-
-    // Only patch today/future docs
-    if (dateStr < todayStr) continue;
-
-    const isNmf =
-      data.type === "NEW_MUSIC_FRIDAY" || data.userEmail === NEW_MUSIC_FRIDAY.label;
-
-    if (!isNmf) continue;
-
-    const ref = doc(db, "nominationsSchedule", dateStr);
-    await updateDoc(ref, {
-      userEmail: NEW_MUSIC_FRIDAY.label,
-      links: NEW_MUSIC_FRIDAY.links,
-      patchedAt: new Date().toISOString(),
-      type: "NEW_MUSIC_FRIDAY",
-    });
-
-    updated++;
-    console.log(`✅ Patched ${dateStr} → updated New Music Friday links`);
-  }
-
-  console.log(`🎉 Patch complete. Scanned ${scanned} docs, updated ${updated}.`);
-}
-
-/**
- * ===========================
- * REACT COMPONENT
- * ===========================
- */
 export default function GenerateSchedule() {
   const [status, setStatus] = useState("Waiting for login...");
 
@@ -300,23 +162,15 @@ export default function GenerateSchedule() {
       }
 
       try {
-        if (MODE === "override_today_only") {
-          setStatus("Applying today-only override...");
-          await overrideTodayOnly();
-          setStatus("✅ Today override written.");
-        } else if (MODE === "generate_range") {
+        if (MODE === "generate_range") {
           setStatus("Generating schedule range...");
           await generateRange(START_DATE, DAYS_TO_ASSIGN);
           setStatus("✅ Schedule generated.");
-        } else if (MODE === "fix_friday_links") {
-          setStatus("Patching existing New Music Friday links...");
-          await fixFridayLinks();
-          setStatus("✅ New Music Friday links patched.");
         } else {
           setStatus("No action: MODE is not recognised.");
         }
       } catch (e) {
-        console.error("❌ Schedule operation failed:", e?.message || e);
+        console.error("Schedule generation failed:", e?.message || e);
         setStatus(`❌ Failed: ${e?.message || String(e)}`);
       }
     });
@@ -338,17 +192,9 @@ export default function GenerateSchedule() {
         <strong>Mode:</strong> {MODE}
       </p>
       <p style={{ margin: "0.5rem 0 0 0" }}>{status}</p>
-
-      <div style={{ marginTop: "0.75rem", fontSize: "0.9em", color: "#444" }}>
-        <div>
-          <strong>Tip:</strong> After this runs successfully, remove{" "}
-          {"<GenerateSchedule />"} from App.js again.
-        </div>
-        <div>
-          <strong>Note:</strong> OVERWRITE_EXISTING is{" "}
-          <code>{String(OVERWRITE_EXISTING)}</code> (generate_range only).
-        </div>
-      </div>
+      <p style={{ marginTop: "0.75rem", fontSize: "0.9em", color: "#444" }}>
+        After this runs successfully, remove the schedule tool from App.js again.
+      </p>
     </div>
   );
 }
