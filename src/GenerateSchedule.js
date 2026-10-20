@@ -1,44 +1,38 @@
+
 import { useEffect, useState } from "react";
 import { auth, db } from "./firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDocs,
+  writeBatch,
+} from "firebase/firestore";
 
-/**
- * ===========================
- * CONFIG
- * ===========================
- */
-
-const MODE = "generate_range";
-
-const START_DATE = "2026-06-08";
+const START_DATE = "2026-10-20";
 const DAYS_TO_ASSIGN = 260;
-const OVERWRITE_EXISTING = false;
 
 const MEMBERS = [
-  { userId: "Z2FQNDa3UwRUVDTqWcSEDJA5kvp2", email: "mattdhodges@outlook.com" },
-  { userId: "uMKdZGXTnafAQtX4QN80ShBYRhh2", email: "davews1621@gmail.com" },
-  { userId: "4ssyOFngYaV6liJMn3qHwtzQzAD2", email: "jfield1968@gmail.com" },
-  { userId: "UJyzC0IXFAbt4RLsfwbFB6u35kz1", email: "scottcee01@googlemail.com" },
+  {
+    userId: "Z2FQNDa3UwRUVDTqWcSEDJA5kvp2",
+    email: "mattdhodges@outlook.com",
+  },
+  {
+    userId: "uMKdZGXTnafAQtX4QN80ShBYRhh2",
+    email: "davews1621@gmail.com",
+  },
+  {
+    userId: "4ssyOFngYaV6liJMn3qHwtzQzAD2",
+    email: "jfield1968@gmail.com",
+  },
+  {
+    userId: "UJyzC0IXFAbt4RLsfwbFB6u35kz1",
+    email: "scottcee01@googlemail.com",
+  },
 ];
 
-const NEW_MUSIC_FRIDAY = {
-  label: "New Music Friday 🎧",
-  links: [
-    "https://en.wikipedia.org/wiki/List_of_2026_albums",
-    "https://www.albumoftheyear.org/releases/this-week/",
-  ],
-};
-
 const UK_BANK_HOLIDAYS = new Set([
-  "2026-01-01",
-  "2026-04-03",
-  "2026-04-06",
-  "2026-05-04",
-  "2026-05-25",
-  "2026-08-31",
   "2026-12-25",
   "2026-12-28",
-
   "2027-01-01",
   "2027-03-26",
   "2027-03-29",
@@ -49,151 +43,219 @@ const UK_BANK_HOLIDAYS = new Set([
   "2027-12-28",
 ]);
 
-function formatLondonDateKey(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/London",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-
-  const y = parts.find((p) => p.type === "year")?.value;
-  const m = parts.find((p) => p.type === "month")?.value;
-  const d = parts.find((p) => p.type === "day")?.value;
-
-  return `${y}-${m}-${d}`;
+function dateKey(date) {
+  return date.toISOString().slice(0, 10);
 }
 
-function londonDayOfWeek(dateStr) {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-
-  const weekday = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/London",
-    weekday: "short",
-  }).format(dt);
-
-  const map = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-  return map[weekday];
+function isNewMusicFriday(entry) {
+  return (
+    entry?.type === "NEW_MUSIC_FRIDAY" ||
+    entry?.userEmail === "New Music Friday 🎧"
+  );
 }
 
-async function writeScheduleDoc(dateStr, payload) {
-  const ref = doc(db, "nominationsSchedule", dateStr);
+function getMemberIndex(entry) {
+  if (!entry || isNewMusicFriday(entry)) return -1;
 
-  if (!OVERWRITE_EXISTING) {
-    const existing = await getDoc(ref);
-    if (existing.exists()) {
-      console.log(`⏭️ Skipping ${dateStr} because it already exists.`);
-      return { skipped: true };
-    }
-  }
-
-  await setDoc(ref, payload);
-  return { skipped: false };
+  return MEMBERS.findIndex(
+    (member) =>
+      member.userId === entry.userId ||
+      member.email.toLowerCase() ===
+        String(entry.userEmail || "").toLowerCase()
+  );
 }
 
-async function generateRange(startDateStr, daysToAssign) {
-  const user = auth.currentUser;
+async function generateSchedule(onProgress) {
+  const snapshot = await getDocs(
+    collection(db, "nominationsSchedule")
+  );
 
-  if (!user) {
-    console.warn("Not authenticated. Log in first.");
-    return;
-  }
+  const existing = new Map();
 
-  console.log(`Authenticated as ${user.email}`);
-  console.log(`Generating ${daysToAssign} assignable schedule days from ${startDateStr}`);
+  snapshot.forEach((item) => {
+    existing.set(item.id, item.data());
+  });
 
-  let current = new Date(`${startDateStr}T12:00:00Z`);
-  let assignedDays = 0;
+  const previousMembers = [...existing.entries()]
+    .filter(([date, entry]) => {
+      return date < START_DATE && getMemberIndex(entry) !== -1;
+    })
+    .sort((a, b) => b[0].localeCompare(a[0]));
+
   let memberIndex = 0;
 
-  while (assignedDays < daysToAssign) {
-    const dateStr = formatLondonDateKey(current);
-    const dow = londonDayOfWeek(dateStr);
+  if (previousMembers.length > 0) {
+    const lastMemberIndex = getMemberIndex(
+      previousMembers[0][1]
+    );
 
-    const isWeekend = dow === 0 || dow === 6;
-    const isHoliday = UK_BANK_HOLIDAYS.has(dateStr);
+    memberIndex =
+      (lastMemberIndex + 1) % MEMBERS.length;
+  }
 
-    if (!isWeekend && !isHoliday) {
-      if (dow === 5) {
-        const res = await writeScheduleDoc(dateStr, {
-          userEmail: NEW_MUSIC_FRIDAY.label,
-          links: NEW_MUSIC_FRIDAY.links,
-          assignedAt: new Date().toISOString(),
-          type: "NEW_MUSIC_FRIDAY",
-        });
+  let current = new Date(`${START_DATE}T12:00:00Z`);
+  let processedDays = 0;
+  let created = 0;
+  let skipped = 0;
+  let batch = writeBatch(db);
+  let batchCount = 0;
 
-        if (!res.skipped) {
-          console.log(`🎧 Assigned ${dateStr} → New Music Friday`);
+  while (processedDays < DAYS_TO_ASSIGN) {
+    const key = dateKey(current);
+    const day = current.getUTCDay();
+
+    const weekend = day === 0 || day === 6;
+    const holiday = UK_BANK_HOLIDAYS.has(key);
+
+    if (!weekend && !holiday) {
+      processedDays++;
+
+      if (existing.has(key)) {
+        skipped++;
+
+        // Existing member nominations must also
+        // advance the rotation.
+        const existingIndex = getMemberIndex(
+          existing.get(key)
+        );
+
+        if (existingIndex !== -1) {
+          memberIndex =
+            (existingIndex + 1) % MEMBERS.length;
         }
       } else {
-        const member = MEMBERS[memberIndex % MEMBERS.length];
+        let payload;
 
-        const res = await writeScheduleDoc(dateStr, {
-          userId: member.userId,
-          userEmail: member.email,
-          assignedAt: new Date().toISOString(),
-          type: "USER",
-        });
+        if (day === 5) {
+          const year = current.getUTCFullYear();
 
-        if (!res.skipped) {
-          console.log(`✅ Assigned ${dateStr} → ${member.email}`);
-          memberIndex++;
+          payload = {
+            userEmail: "New Music Friday 🎧",
+            links: [
+              `https://en.wikipedia.org/wiki/List_of_${year}_albums`,
+              "https://www.albumoftheyear.org/releases/this-week/",
+            ],
+            type: "NEW_MUSIC_FRIDAY",
+            assignedAt: new Date().toISOString(),
+          };
+        } else {
+          const member = MEMBERS[memberIndex];
+
+          payload = {
+            userId: member.userId,
+            userEmail: member.email,
+            type: "USER",
+            assignedAt: new Date().toISOString(),
+          };
+
+          memberIndex =
+            (memberIndex + 1) % MEMBERS.length;
+        }
+
+        batch.set(
+          doc(db, "nominationsSchedule", key),
+          payload
+        );
+
+        created++;
+        batchCount++;
+
+        if (batchCount >= 400) {
+          await batch.commit();
+          batch = writeBatch(db);
+          batchCount = 0;
         }
       }
-
-      assignedDays++;
     }
 
     current.setUTCDate(current.getUTCDate() + 1);
   }
 
-  console.log("Schedule generation complete.");
+  if (batchCount > 0) {
+    await batch.commit();
+  }
+
+  onProgress({
+    created,
+    skipped,
+    lastDate: dateKey(
+      new Date(current.getTime() - 86400000)
+    ),
+  });
 }
 
 export default function GenerateSchedule() {
-  const [status, setStatus] = useState("Waiting for login...");
+  const [status, setStatus] = useState(
+    "Ready to extend nomination schedule."
+  );
 
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (!user) {
-        setStatus("Not logged in — please log in first.");
-        return;
-      }
+  const [running, setRunning] = useState(false);
+  const [complete, setComplete] = useState(false);
 
-      try {
-        if (MODE === "generate_range") {
-          setStatus("Generating schedule range...");
-          await generateRange(START_DATE, DAYS_TO_ASSIGN);
-          setStatus("✅ Schedule generated.");
-        } else {
-          setStatus("No action: MODE is not recognised.");
-        }
-      } catch (e) {
-        console.error("Schedule generation failed:", e?.message || e);
-        setStatus(`❌ Failed: ${e?.message || String(e)}`);
-      }
-    });
+  const runGenerator = async () => {
+    if (!auth.currentUser || running || complete) return;
 
-    return () => unsubscribe();
-  }, []);
+    const confirmed = window.confirm(
+      "Extend the IA Music Club nomination schedule? Existing dates will be preserved."
+    );
+
+    if (!confirmed) return;
+
+    setRunning(true);
+    setStatus("Generating schedule...");
+
+    try {
+      await generateSchedule((result) => {
+        setStatus(
+          `✅ Complete. Created ${result.created} new entries. ` +
+          `Preserved ${result.skipped} existing entries. ` +
+          `Schedule processed through ${result.lastDate}.`
+        );
+      });
+
+      setComplete(true);
+    } catch (error) {
+      console.error(error);
+      setStatus(
+        `❌ Failed: ${error?.message || String(error)}`
+      );
+    } finally {
+      setRunning(false);
+    }
+  };
 
   return (
     <div
-      style={{
-        marginTop: "1.5rem",
-        padding: "1rem",
-        background: "#f0f8ff",
-        borderRadius: 8,
-      }}
+      className="card"
+      style={{ marginTop: 14 }}
     >
-      <h3 style={{ marginTop: 0 }}>📅 Schedule Tool</h3>
-      <p style={{ margin: 0 }}>
-        <strong>Mode:</strong> {MODE}
+      <h3 style={{ marginTop: 0 }}>
+        📅 Schedule Generator
+      </h3>
+
+      <p className="smallNote">
+        Start date: {START_DATE}
       </p>
-      <p style={{ margin: "0.5rem 0 0 0" }}>{status}</p>
-      <p style={{ marginTop: "0.75rem", fontSize: "0.9em", color: "#444" }}>
-        After this runs successfully, remove the schedule tool from App.js again.
+
+      <p className="smallNote">
+        Generates {DAYS_TO_ASSIGN} eligible weekdays,
+        preserving existing nominations.
+      </p>
+
+      <button
+        className="btn"
+        onClick={runGenerator}
+        disabled={running || complete}
+      >
+        {running
+          ? "Generating..."
+          : complete
+          ? "Schedule generated"
+          : "Extend nomination schedule"}
+      </button>
+
+      <p style={{ marginTop: 12 }}>
+        {status}
       </p>
     </div>
   );
