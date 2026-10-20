@@ -16,7 +16,7 @@ import NewMusicRecommends from "./NewMusicRecommends";
 import OnThisDay from "./OnThisDay";
 import TasteMap from "./TasteMap";
 import HallOfFame from "./HallOfFame";
-import GenerateSchedule from "./GenerateSchedule";
+
 
 
 const PARTICIPANTS = {
@@ -198,7 +198,7 @@ export default function App() {
             </p>
           </div>
 
-<GenerateSchedule />
+
           {activeTab === "home" ? (
             <>
               <div style={{ marginTop: 14 }}>
